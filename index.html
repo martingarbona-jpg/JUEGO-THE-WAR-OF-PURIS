@@ -66,8 +66,16 @@
       flex: 1;
       min-height: 0;
       display: flex;
-      align-items: stretch;
+      align-items: center;
       justify-content: center;
+    }
+
+    .stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      max-width: 100%;
+      max-height: 100%;
     }
 
     #pauseBtn {
@@ -202,7 +210,7 @@
 
       .wrap {
         min-height: calc(100dvh - 8px);
-        gap: 6px;
+        gap: 4px;
       }
 
       .hud {
@@ -244,20 +252,20 @@
 
       .mobile-controls {
         display: grid;
-        gap: 8px;
+        gap: 6px;
         margin-top: 0;
       }
 
       .mobile-btn {
-        padding: 12px 10px;
-        font-size: 21px;
+        padding: 10px 10px;
+        font-size: 20px;
         border-radius: 14px;
       }
 
       .help {
         margin-top: 0;
-        font-size: 11px;
-        line-height: 1.35;
+        font-size: 10px;
+        line-height: 1.2;
       }
     }
   </style>
@@ -296,21 +304,23 @@
     </div>
 
     <div class="canvas-box">
-      <canvas id="game" width="900" height="540"></canvas>
-      <button id="pauseBtn" type="button" aria-label="Pausar juego">⏸</button>
+      <div class="stage" id="stage">
+        <canvas id="game" width="900" height="540"></canvas>
+        <button id="pauseBtn" type="button" aria-label="Pausar juego">⏸</button>
 
-      <div class="overlay show" id="overlay">
-        <div class="panel">
-          <h1 id="overlayTitle">PURIS VS LAS MAQUINAS</h1>
-          <p id="overlayText">
-            Boss 1 a los 30 segundos.<br>
-            Boss 2 a los 40 segundos de matar al Boss 1.<br>
-            Boss 3 a los 60 segundos de matar al Boss 2.<br>
-            La W mejora el arma y también transforma la nave.
-          </p>
-          <div class="btns">
-            <button class="btn-primary" id="startBtn">Empezar</button>
-            <button class="btn-secondary" id="restartBtn">Reiniciar</button>
+        <div class="overlay show" id="overlay">
+          <div class="panel">
+            <h1 id="overlayTitle">PURIS VS LAS MAQUINAS</h1>
+            <p id="overlayText">
+              Boss 1 a los 30 segundos.<br>
+              Boss 2 a los 40 segundos de matar al Boss 1.<br>
+              Boss 3 a los 60 segundos de matar al Boss 2.<br>
+              La W mejora el arma y también transforma la nave.
+            </p>
+            <div class="btns">
+              <button class="btn-primary" id="startBtn">Empezar</button>
+              <button class="btn-secondary" id="restartBtn">Reiniciar</button>
+            </div>
           </div>
         </div>
       </div>
@@ -329,6 +339,7 @@
   <script>
     const canvas = document.getElementById("game");
     const canvasBox = document.querySelector(".canvas-box");
+    const stage = document.getElementById("stage");
     const ctx = canvas.getContext("2d");
 
     const coinsEl = document.getElementById("coins");
@@ -354,6 +365,9 @@
     const SECOND_BOSS_DELAY_AFTER_KILL = 30;
     const THIRD_BOSS_DELAY_AFTER_KILL = 30;
     const FOURTH_BOSS_DELAY_AFTER_KILL = 60;
+    const DESKTOP_WORLD = { width: 900, height: 540 };
+    const MOBILE_WORLD = { width: 540, height: 900 };
+    const MOBILE_BREAKPOINT = window.matchMedia("(max-width: 768px)");
 
     let animationId = null;
     let running = false;
@@ -405,26 +419,46 @@
     let bgmSource = null;
     let audioReady = false;
     let lastEnemyExplosionAt = 0;
+    let lastStageWidth = 0;
+    let lastStageHeight = 0;
 
 
     function clamp(value, min, max) {
       return Math.min(Math.max(value, min), max);
     }
 
+    function getTargetWorldSize() {
+      return MOBILE_BREAKPOINT.matches ? MOBILE_WORLD : DESKTOP_WORLD;
+    }
+
     function resizeCanvas() {
       const rect = canvasBox.getBoundingClientRect();
-      const nextWidth = Math.max(1, Math.round(rect.width));
-      const nextHeight = Math.max(1, Math.round(rect.height));
+      const { width: nextWidth, height: nextHeight } = getTargetWorldSize();
       const prevWidth = canvas.width;
       const prevHeight = canvas.height;
+      const scale = Math.min(rect.width / nextWidth, rect.height / nextHeight);
+      const nextStageWidth = Math.max(1, Math.round(nextWidth * scale));
+      const nextStageHeight = Math.max(1, Math.round(nextHeight * scale));
 
-      if (!nextWidth || !nextHeight || (nextWidth === prevWidth && nextHeight === prevHeight)) return;
+      if (!nextWidth || !nextHeight || !Number.isFinite(scale) || scale <= 0) return;
+
+      stage.style.width = `${nextStageWidth}px`;
+      stage.style.height = `${nextStageHeight}px`;
+
+      if (
+        nextWidth === prevWidth &&
+        nextHeight === prevHeight &&
+        nextStageWidth === lastStageWidth &&
+        nextStageHeight === lastStageHeight
+      ) return;
 
       const scaleX = prevWidth ? nextWidth / prevWidth : 1;
       const scaleY = prevHeight ? nextHeight / prevHeight : 1;
 
       canvas.width = nextWidth;
       canvas.height = nextHeight;
+      lastStageWidth = nextStageWidth;
+      lastStageHeight = nextStageHeight;
 
       player.x *= scaleX;
       player.y = canvas.height - 76;
