@@ -117,12 +117,13 @@
 
     .mobile-lives {
       display: inline-flex;
+      flex-direction: column;
       position: absolute;
       top: 14px;
       left: 14px;
       z-index: 1001;
-      align-items: center;
-      gap: 6px;
+      align-items: flex-start;
+      gap: 4px;
       padding: 0;
       background: transparent;
       border: none;
@@ -130,6 +131,12 @@
       pointer-events: none;
       line-height: 1;
       text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+    }
+
+    .mobile-lives-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .mobile-lives-label {
@@ -593,6 +600,10 @@
         gap: 4px;
       }
 
+      body.mobile-ui .mobile-lives-row {
+        gap: 4px;
+      }
+
       body.mobile-ui .mobile-lives-label {
         font-size: 12px;
         filter: none;
@@ -630,9 +641,19 @@
     <div class="canvas-box">
       <div class="stage" id="stage">
         <canvas id="game" width="900" height="540"></canvas>
-        <div class="mobile-lives" id="mobileLives" aria-label="Vidas" aria-live="polite">
-          <span class="mobile-lives-label" aria-hidden="true">❤️</span>
-          <span class="mobile-lives-value" id="mobileLivesValue">3</span>
+        <div class="mobile-lives" id="mobileLives" aria-label="Estado del jugador" aria-live="polite">
+          <div class="mobile-lives-row">
+            <span class="mobile-lives-label" aria-hidden="true">❤️</span>
+            <span class="mobile-lives-value" id="mobileLivesValue">3</span>
+          </div>
+          <div class="mobile-lives-row">
+            <span class="mobile-lives-label" aria-hidden="true">🪙</span>
+            <span class="mobile-lives-value" id="mobileCoinsValue">0</span>
+          </div>
+          <div class="mobile-lives-row">
+            <span class="mobile-lives-label" aria-hidden="true">👾</span>
+            <span class="mobile-lives-value" id="mobileKillsValue">0</span>
+          </div>
         </div>
         <div class="hud">
           <div class="card">
@@ -728,6 +749,8 @@
     const nextBossEl = document.getElementById("nextBoss");
     const timeEl = document.getElementById("time");
     const mobileLivesValueEl = document.getElementById("mobileLivesValue");
+    const mobileCoinsValueEl = document.getElementById("mobileCoinsValue");
+    const mobileKillsValueEl = document.getElementById("mobileKillsValue");
 
     const overlay = document.getElementById("overlay");
     const overlayTitle = document.getElementById("overlayTitle");
@@ -744,7 +767,7 @@
     const moveLeftBtn = document.getElementById("moveLeftBtn");
     const moveRightBtn = document.getElementById("moveRightBtn");
 
-    const UPGRADE_STEPS = [25, 90, 200, 300];
+    const UPGRADE_STEPS = [25, 75, 190, 290];
     const FIRST_BOSS_TIME = 30;
     const SECOND_BOSS_DELAY_AFTER_KILL = 30;
     const THIRD_BOSS_DELAY_AFTER_KILL = 30;
@@ -1145,9 +1168,9 @@
     }
 
     function maxWeaponLevelAvailableByCoins() {
-      if (coins >= 300) return 5;
-      if (coins >= 200) return 4;
-      if (coins >= 90) return 3;
+      if (coins >= 290) return 5;
+      if (coins >= 190) return 4;
+      if (coins >= 75) return 3;
       if (coins >= 25) return 2;
       return 1;
     }
@@ -1199,6 +1222,8 @@
       bestEl.textContent = bestCoins;
       livesEl.textContent = lives;
       mobileLivesValueEl.textContent = lives;
+      mobileCoinsValueEl.textContent = coins;
+      mobileKillsValueEl.textContent = totalEnemyKills;
       weaponEl.textContent = diamondMode ? "◆" : weaponLevel;
       nextUpgradeEl.textContent = nextUpgradeTarget();
       timeEl.textContent = `${elapsedSeconds}s`;
@@ -1703,7 +1728,7 @@
       const moveSpeed =
         bossIndex === 1 ? 1.15 :
         bossIndex === 2 ? 1.62 :
-        bossIndex === 3 ? 2.08 :
+        bossIndex === 3 ? 1.94 :
         2.48;
       const aggressionMultiplier = bossAggressionMultiplier(bossIndex);
 
@@ -2188,7 +2213,7 @@
         const baseCooldown =
           boss.type === 1 ? 124 :
           boss.type === 2 ? 78 :
-          boss.type === 3 ? 54 :
+          boss.type === 3 ? 60 :
           42;
         boss.fireCooldown = Math.max(20, Math.round(baseCooldown / bossAggressionMultiplier(boss.type)));
       }
@@ -2214,7 +2239,7 @@
         radius = 6;
       } else if (boss.type === 3) {
         pattern = [-0.84, -0.42, 0, 0.42, 0.84];
-        speed = 2.06;
+        speed = 1.92;
         radius = 7;
       } else {
         pattern = [-1.04, -0.7, -0.34, 0, 0.34, 0.7, 1.04];
