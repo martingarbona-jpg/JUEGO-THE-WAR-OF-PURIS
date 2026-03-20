@@ -7,12 +7,18 @@
   <style>
     * { box-sizing: border-box; }
 
+    html,
+    body {
+      min-height: 100%;
+    }
+
     body {
       margin: 0;
       font-family: Arial, sans-serif;
       background: radial-gradient(circle at top, #1e293b 0%, #0f172a 45%, #020617 100%);
       color: white;
       min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -183,48 +189,73 @@
 
     @media (max-width: 768px) {
       body {
-        padding: 8px;
+        padding: 4px;
         align-items: flex-start;
       }
 
+      .wrap {
+        min-height: calc(100dvh - 8px);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
       .hud {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 4px;
-        padding: 4px;
+        margin-bottom: 0;
       }
 
-      .hud .card,
-      .hud-box {
-        padding: 4px;
-        font-size: 11px;
+      .card {
+        padding: 5px 4px;
+        border-radius: 10px;
       }
 
-      .hud .label,
-      .hud-box span {
-        font-size: 9px;
-        margin-bottom: 2px;
+      .label {
+        font-size: 8px;
+        margin-bottom: 1px;
       }
 
-      .hud .value,
-      .hud-box strong {
-        font-size: 13px;
+      .value {
+        font-size: 12px;
+      }
+
+      .canvas-box {
+        flex: 1;
+        min-height: 0;
       }
 
       canvas {
         width: 100%;
-        height: 65vh;
+        height: calc(100dvh - 168px);
+        min-height: 320px;
         max-height: none;
+        border-radius: 14px;
       }
 
       #pauseBtn {
         top: 8px;
         right: 8px;
-        font-size: 18px;
-        padding: 8px 12px;
+        font-size: 17px;
+        padding: 7px 11px;
       }
 
       .mobile-controls {
         display: grid;
+        gap: 8px;
+        margin-top: 0;
+      }
+
+      .mobile-btn {
+        padding: 12px 10px;
+        font-size: 21px;
+        border-radius: 14px;
+      }
+
+      .help {
+        margin-top: 0;
+        font-size: 11px;
+        line-height: 1.35;
       }
     }
   </style>
@@ -366,6 +397,11 @@
     let currentBossTheme = 1;
     let bossIntroTimer = 0;
     let bossIntroLabel = "";
+    let audioCtx = null;
+    let bgmGain = null;
+    let bgmSource = null;
+    let audioReady = false;
+    let lastEnemyExplosionAt = 0;
 
 
     function createToneDataUrl(frequency, duration, volume = 0.35) {
@@ -407,15 +443,100 @@
       return `data:audio/wav;base64,${btoa(binary)}`;
     }
 
-    const sShoot = new Audio(createToneDataUrl(880, 0.05, 0.22));
-    const sKill = new Audio(createToneDataUrl(220, 0.08, 0.28));
     const sBossSpawn = new Audio(createToneDataUrl(140, 0.35, 0.32));
-    const sBossDie = new Audio(createToneDataUrl(110, 0.5, 0.34));
 
-    sShoot.volume = 0.3;
-    sKill.volume = 0.35;
     sBossSpawn.volume = 0.45;
-    sBossDie.volume = 0.5;
+
+    function ensureAudioReady() {
+      if (audioReady) return;
+
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) {
+        audioReady = true;
+        return;
+      }
+
+      audioCtx = new AudioContextClass();
+      bgmGain = audioCtx.createGain();
+      bgmGain.gain.value = 0.15;
+      bgmGain.connect(audioCtx.destination);
+      audioReady = true;
+      startBgmLoop();
+    }
+
+    function createArcadeLoopBuffer() {
+      const sampleRate = audioCtx.sampleRate;
+      const beat = 0.25;
+      const sequence = [261.63, 392.0, 329.63, 523.25, 293.66, 440.0, 349.23, 587.33];
+      const duration = sequence.length * beat;
+      const buffer = audioCtx.createBuffer(1, Math.floor(sampleRate * duration), sampleRate);
+      const channel = buffer.getChannelData(0);
+
+      for (let i = 0; i < channel.length; i++) {
+        const t = i / sampleRate;
+        const noteIndex = Math.min(sequence.length - 1, Math.floor(t / beat));
+        const noteTime = t - noteIndex * beat;
+        const env = Math.max(0, 1 - noteTime / beat) ** 1.6;
+        const freq = sequence[noteIndex];
+        const toneA = Math.sin(2 * Math.PI * freq * t);
+        const toneB = Math.sign(Math.sin(2 * Math.PI * (freq * 0.5) * t));
+        channel[i] = (toneA * 0.55 + toneB * 0.18) * env * 0.26;
+      }
+
+      return buffer;
+    }
+
+    function startBgmLoop() {
+      if (!audioCtx || bgmSource) return;
+
+      bgmSource = audioCtx.createBufferSource();
+      bgmSource.buffer = createArcadeLoopBuffer();
+      bgmSource.loop = true;
+      bgmSource.connect(bgmGain);
+      bgmSource.start();
+      bgmSource.onended = () => {
+        bgmSource = null;
+      };
+    }
+
+    function playSynthExplosion(type) {
+      if (!audioCtx) return;
+
+      const now = audioCtx.currentTime;
+      const isBoss = type === "boss";
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      const filter = audioCtx.createBiquadFilter();
+
+      osc.type = isBoss ? "sawtooth" : "triangle";
+      osc.frequency.setValueAtTime(isBoss ? 180 : 240, now);
+      osc.frequency.exponentialRampToValueAtTime(isBoss ? 45 : 110, now + (isBoss ? 0.45 : 0.14));
+
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(isBoss ? 900 : 1400, now);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(isBoss ? 0.22 : 0.08, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + (isBoss ? 0.6 : 0.18));
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start(now);
+      osc.stop(now + (isBoss ? 0.65 : 0.2));
+    }
+
+    function playEnemyExplosionSound() {
+      if (!audioCtx) return;
+      if (audioCtx.currentTime - lastEnemyExplosionAt < 0.06) return;
+      lastEnemyExplosionAt = audioCtx.currentTime;
+      playSynthExplosion("enemy");
+    }
+
+    function playBossExplosionSound() {
+      playSynthExplosion("boss");
+    }
 
     function playSound(audio, restart = true) {
       if (restart) audio.currentTime = 0;
@@ -563,6 +684,17 @@
         a.y < b.y + b.h &&
         a.y + a.h > b.y
       );
+    }
+
+    function getPlayerHitbox() {
+      const hitW = player.w * 0.64;
+      const hitH = player.h * 0.68;
+      return {
+        x: player.x + (player.w - hitW) / 2,
+        y: player.y + (player.h - hitH) / 2 + 4,
+        w: hitW,
+        h: hitH
+      };
     }
 
     function circleRectCollide(circle, rect) {
@@ -755,8 +887,6 @@
     function fireWeapon() {
       const dmg = weaponDamage(weaponLevel);
       const centerX = player.x + player.w / 2;
-
-      playSound(sShoot);
 
       if (weaponLevel === 1) {
         bullets.push({ x: centerX - 3, y: player.y - 10, w: 6, h: 16, speed: 8, damage: dmg, type: "normal", color: "#38bdf8" });
@@ -970,7 +1100,7 @@
             if (e.hp <= 0) {
               createExplosion(e.x + e.w / 2, e.y + e.h / 2, 14, e.colors.fill);
               spawnCoin(e.x + e.w / 2 - 11, e.y + e.h / 2 - 11, e.maxHp);
-              playSound(sKill);
+              playEnemyExplosionSound();
               enemies.splice(j, 1);
             }
             break;
@@ -1000,7 +1130,7 @@
           if (boss.hp <= 0) {
             const defeatedBossType = boss.type;
 
-            playSound(sBossDie, false);
+            playBossExplosionSound();
             createExplosion(boss.x + boss.w / 2, boss.y + boss.h / 2, 40, "#f59e0b");
             for (let n = 0; n < 6; n++) {
               spawnCoin(
@@ -1027,9 +1157,11 @@
     }
 
     function handlePlayerCollisions() {
+      const playerHitbox = getPlayerHitbox();
+
       if (player.hitCooldown <= 0) {
         for (let i = enemies.length - 1; i >= 0; i--) {
-          if (rectsCollide(player, enemies[i])) {
+          if (rectsCollide(playerHitbox, enemies[i])) {
             createExplosion(player.x + player.w / 2, player.y + player.h / 2, 18, "#ffffff");
             enemies.splice(i, 1);
             lives--;
@@ -1039,7 +1171,7 @@
           }
         }
 
-        if (boss && rectsCollide(player, boss)) {
+        if (boss && rectsCollide(playerHitbox, boss)) {
           createExplosion(player.x + player.w / 2, player.y + player.h / 2, 18, "#ffffff");
           lives--;
           player.hitCooldown = 70;
@@ -1047,7 +1179,7 @@
         }
 
         for (let i = bossBullets.length - 1; i >= 0; i--) {
-          if (circleRectCollide(bossBullets[i], player)) {
+          if (circleRectCollide(bossBullets[i], playerHitbox)) {
             bossBullets.splice(i, 1);
             createExplosion(player.x + player.w / 2, player.y + player.h / 2, 10, "#fca5a5");
             lives--;
@@ -1588,6 +1720,15 @@
     function togglePause() {
       if (!running) return;
       isPaused = !isPaused;
+
+      if (audioCtx && audioCtx.state !== "closed") {
+        if (isPaused) {
+          audioCtx.suspend().catch(() => {});
+        } else {
+          audioCtx.resume().catch(() => {});
+        }
+      }
+
       updatePauseButton();
     }
 
@@ -1634,6 +1775,18 @@
 
     pauseBtn.onclick = togglePause;
 
+    const unlockAudio = () => {
+      ensureAudioReady();
+      if (audioCtx && audioCtx.state === "suspended" && !isPaused) {
+        audioCtx.resume().catch(() => {});
+      }
+      startBgmLoop();
+    };
+
+    window.addEventListener("pointerdown", unlockAudio, { passive: true });
+    window.addEventListener("keydown", unlockAudio, { passive: true });
+    startBtn.addEventListener("click", unlockAudio);
+    restartBtn.addEventListener("click", unlockAudio);
     startBtn.addEventListener("click", startGame);
     restartBtn.addEventListener("click", startGame);
 
