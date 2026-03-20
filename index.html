@@ -668,6 +668,7 @@
     const MOBILE_WORLD = { width: 900, height: 540 };
     const MOBILE_BREAKPOINT = window.matchMedia("(max-width: 768px)");
     const COARSE_POINTER = window.matchMedia("(pointer: coarse)");
+    const NO_HOVER_POINTER = window.matchMedia("(hover: none)");
     const PORTRAIT_ORIENTATION = window.matchMedia("(orientation: portrait)");
 
     let animationId = null;
@@ -735,7 +736,14 @@
     }
 
     function isMobileDevice() {
-      return MOBILE_BREAKPOINT.matches && COARSE_POINTER.matches;
+      const hasTouchPoints = navigator.maxTouchPoints > 0;
+      const userAgent = navigator.userAgent || "";
+      const mobileUserAgent = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini|Mobile/i.test(userAgent);
+      const userAgentDataMobile = typeof navigator.userAgentData?.mobile === "boolean"
+        ? navigator.userAgentData.mobile
+        : false;
+      const touchLikeDevice = COARSE_POINTER.matches || NO_HOVER_POINTER.matches || hasTouchPoints;
+      return MOBILE_BREAKPOINT.matches && (touchLikeDevice || mobileUserAgent || userAgentDataMobile);
     }
 
     function shouldBlockPortraitMobile() {
@@ -775,9 +783,17 @@
       return MOBILE_BREAKPOINT.matches ? MOBILE_WORLD : DESKTOP_WORLD;
     }
 
+    let lastLoggedBodyClassName = null;
+
     function syncGameUiState() {
-      document.body.classList.toggle("mobile-ui", isMobileDevice());
+      const shouldUseMobileUi = isMobileDevice();
+      document.body.classList.toggle("mobile-ui", shouldUseMobileUi);
       document.body.classList.toggle("game-active", running && !overlay.classList.contains("show"));
+
+      if (document.body.className !== lastLoggedBodyClassName) {
+        console.log("[syncGameUiState] body.className =", document.body.className);
+        lastLoggedBodyClassName = document.body.className;
+      }
     }
 
     function syncMobileViewportState() {
@@ -2471,7 +2487,7 @@
 
     pauseBtn.onclick = togglePause;
 
-    [MOBILE_BREAKPOINT, COARSE_POINTER, PORTRAIT_ORIENTATION].forEach((mediaQuery) => {
+    [MOBILE_BREAKPOINT, COARSE_POINTER, NO_HOVER_POINTER, PORTRAIT_ORIENTATION].forEach((mediaQuery) => {
       const handleChange = () => resizeCanvas();
       if (typeof mediaQuery.addEventListener === "function") {
         mediaQuery.addEventListener("change", handleChange);
@@ -2497,6 +2513,9 @@
     bindPressControl(moveRightBtn, pressRight);
 
     window.addEventListener("resize", resizeCanvas);
+    window.addEventListener("orientationchange", resizeCanvas);
+    document.addEventListener("fullscreenchange", resizeCanvas);
+    document.addEventListener("webkitfullscreenchange", resizeCanvas);
     if (window.visualViewport) {
       window.visualViewport.addEventListener("resize", resizeCanvas);
     }
@@ -2507,8 +2526,13 @@
       event.preventDefault();
     }, { passive: false });
 
+    syncGameUiState();
     resetGame();
     showStartScreen();
+    requestAnimationFrame(() => {
+      syncGameUiState();
+      resizeCanvas();
+    });
   </script>
 </body>
 </html>
