@@ -725,6 +725,7 @@
     let lastStageHeight = 0;
     let autoPausedByOrientation = false;
     let activeTouchId = null;
+    let mobileUiLocked = false;
     let celebrationAnimationId = null;
     let celebrationTimeoutId = null;
     let celebrationParticles = [];
@@ -786,7 +787,7 @@
     let lastLoggedBodyClassName = null;
 
     function syncGameUiState() {
-      const shouldUseMobileUi = isMobileDevice();
+      const shouldUseMobileUi = mobileUiLocked || isMobileDevice();
       document.body.classList.toggle("mobile-ui", shouldUseMobileUi);
       document.body.classList.toggle("game-active", running && !overlay.classList.contains("show"));
 
@@ -1483,6 +1484,7 @@
     }
 
     function handleGameEntry() {
+      mobileUiLocked = isMobileDevice();
       unlockAudio();
       primeMobileViewport();
       requestGameFullscreen();
