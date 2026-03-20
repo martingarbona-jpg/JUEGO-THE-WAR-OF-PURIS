@@ -1729,7 +1729,7 @@
         bossIndex === 1 ? 1.15 :
         bossIndex === 2 ? 1.62 :
         bossIndex === 3 ? 1.94 :
-        2.48;
+        2.26;
       const aggressionMultiplier = bossAggressionMultiplier(bossIndex);
 
       boss = {
@@ -1975,11 +1975,11 @@
       }
 
       if (weaponLevel === 4) {
-        bullets.push({ x: centerX - 5, y: 0, w: 10, h: player.y + 10, speed: 0, damage: dmg, type: "laser-red", color: "#ef4444", life: 2 });
+        bullets.push({ x: centerX - 6.5, y: 0, w: 13, h: player.y + 10, speed: 0, damage: dmg, type: "laser-red", color: "#ef4444", life: 2 });
       }
 
       if (weaponLevel === 5) {
-        bullets.push({ x: centerX - 6, y: 0, w: 12, h: player.y + 10, speed: 0, damage: dmg, type: "laser-gold", color: "#facc15", life: 2 });
+        bullets.push({ x: centerX - 8, y: 0, w: 16, h: player.y + 10, speed: 0, damage: dmg, type: "laser-gold", color: "#facc15", life: 2 });
       }
 
       if (weaponLevel === 6) {
@@ -2214,7 +2214,7 @@
           boss.type === 1 ? 124 :
           boss.type === 2 ? 78 :
           boss.type === 3 ? 60 :
-          42;
+          46;
         boss.fireCooldown = Math.max(20, Math.round(baseCooldown / bossAggressionMultiplier(boss.type)));
       }
     }
@@ -2243,7 +2243,7 @@
         radius = 7;
       } else {
         pattern = [-1.04, -0.7, -0.34, 0, 0.34, 0.7, 1.04];
-        speed = 2.34;
+        speed = 2.22;
         radius = 8;
       }
 
@@ -2743,14 +2743,19 @@
     function drawBullets() {
       for (const b of bullets) {
         if (b.type === "laser-red" || b.type === "laser-gold" || b.type === "laser-diamond") {
+          ctx.save();
           ctx.globalAlpha = b.type === "laser-diamond" ? 0.82 : 0.65;
           ctx.fillStyle = b.color;
+          if (b.type === "laser-red" || b.type === "laser-gold") {
+            ctx.shadowColor = b.color;
+            ctx.shadowBlur = 10;
+          }
           ctx.fillRect(b.x, b.y, b.w, b.h);
           if (b.type === "laser-diamond") {
             ctx.fillStyle = "rgba(255,255,255,0.55)";
             ctx.fillRect(b.x + 3, b.y, Math.max(2, b.w - 6), b.h);
           }
-          ctx.globalAlpha = 1;
+          ctx.restore();
         } else {
           ctx.fillStyle = b.color;
           ctx.fillRect(b.x, b.y, b.w, b.h);
