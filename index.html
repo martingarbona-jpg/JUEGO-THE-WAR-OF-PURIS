@@ -123,11 +123,10 @@
       z-index: 1001;
       align-items: center;
       gap: 4px;
-      padding: 4px 8px;
-      border-radius: 999px;
-      background: rgba(2, 6, 23, 0.38);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.16);
+      padding: 0;
+      background: transparent;
+      border: none;
+      box-shadow: none;
       pointer-events: none;
       line-height: 1;
     }
@@ -467,6 +466,14 @@
       min-height: 72px;
     }
 
+    body.mobile-ui .hud {
+      display: none !important;
+    }
+
+    body.mobile-ui .mobile-lives {
+      display: inline-flex;
+    }
+
     @media (max-width: 768px) {
       body.mobile-ui {
         padding: 0;
@@ -482,14 +489,6 @@
       body.mobile-ui .canvas-box {
         flex: 1;
         min-height: 0;
-      }
-
-      body.mobile-ui .hud {
-        display: none !important;
-      }
-
-      body.mobile-ui .mobile-lives {
-        display: inline-flex;
       }
 
       body.mobile-ui canvas {
