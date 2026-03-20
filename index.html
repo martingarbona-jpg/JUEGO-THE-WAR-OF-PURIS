@@ -1737,7 +1737,7 @@
       const moveSpeed =
         bossIndex === 1 ? 1.15 :
         bossIndex === 2 ? 1.62 :
-        bossIndex === 3 ? 1.94 :
+        bossIndex === 3 ? 1.84 :
         2.26;
       const aggressionMultiplier = bossAggressionMultiplier(bossIndex);
 
@@ -2224,7 +2224,7 @@
         const baseCooldown =
           boss.type === 1 ? 124 :
           boss.type === 2 ? 78 :
-          boss.type === 3 ? 60 :
+          boss.type === 3 ? 66 :
           46;
         boss.fireCooldown = Math.max(20, Math.round(baseCooldown / bossAggressionMultiplier(boss.type)));
       }
@@ -2250,7 +2250,7 @@
         radius = 6;
       } else if (boss.type === 3) {
         pattern = [-0.84, -0.42, 0, 0.42, 0.84];
-        speed = 1.92;
+        speed = 1.84;
         radius = 7;
       } else {
         pattern = [-1.04, -0.7, -0.34, 0, 0.34, 0.7, 1.04];
@@ -2332,12 +2332,24 @@
             playBossExplosionSound();
             createExplosion(boss.x + boss.w / 2, boss.y + boss.h / 2, 40, "#f59e0b");
             triggerScreenEffect(10, 18, "rgba(255, 245, 180, 0.42)");
-            for (let n = 0; n < 6; n++) {
+            const bossCoinValue = Math.min(5, boss.type + 2);
+            const baseBossCoinCount = 6;
+            let extraBossCoinValue = Math.round(baseBossCoinCount * bossCoinValue * 0.25);
+            for (let n = 0; n < baseBossCoinCount; n++) {
               spawnCoin(
                 boss.x + 20 + Math.random() * (boss.w - 40),
                 boss.y + 20 + Math.random() * (boss.h - 20),
-                Math.min(5, boss.type + 2)
+                bossCoinValue
               );
+            }
+            while (extraBossCoinValue > 0) {
+              const bonusCoinValue = Math.min(5, extraBossCoinValue);
+              spawnCoin(
+                boss.x + 20 + Math.random() * (boss.w - 40),
+                boss.y + 20 + Math.random() * (boss.h - 20),
+                bonusCoinValue
+              );
+              extraBossCoinValue -= bonusCoinValue;
             }
 
             if (defeatedBossType === 1) {
