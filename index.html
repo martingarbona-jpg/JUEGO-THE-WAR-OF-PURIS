@@ -116,30 +116,33 @@
     }
 
     .mobile-lives {
-      display: none;
+      display: inline-flex;
       position: absolute;
-      top: 10px;
-      left: 10px;
+      top: 14px;
+      left: 14px;
       z-index: 1001;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
       padding: 0;
       background: transparent;
       border: none;
       box-shadow: none;
       pointer-events: none;
       line-height: 1;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
     }
 
     .mobile-lives-label {
-      font-size: 12px;
+      font-size: 18px;
+      filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.35));
     }
 
     .mobile-lives-value {
-      font-size: 12px;
-      font-weight: 700;
+      font-size: 18px;
+      font-weight: 800;
       color: #fff;
       font-variant-numeric: tabular-nums;
+      letter-spacing: 0.04em;
     }
 
     .overlay-extra {
@@ -293,6 +296,31 @@
       }
     }
 
+
+    @keyframes titleEntrance {
+      0% {
+        opacity: 0;
+        transform: scale(0.84) translateY(-12px);
+      }
+      68% {
+        opacity: 1;
+        transform: scale(1.04) translateY(0);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    @keyframes titleGlow {
+      0%, 100% {
+        filter: drop-shadow(0 0 10px rgba(250, 204, 21, 0.12));
+      }
+      50% {
+        filter: drop-shadow(0 0 18px rgba(250, 204, 21, 0.22));
+      }
+    }
+
     .orientation-panel {
       max-width: 360px;
       padding: 24px 22px;
@@ -402,12 +430,40 @@
     }
 
     .start-title {
-      margin: 0 0 12px;
-      font-size: clamp(34px, 5vw, 48px);
-      line-height: 1.05;
-      letter-spacing: 1.8px;
+      position: relative;
+      margin: 0 0 16px;
+      font-size: clamp(40px, 6vw, 64px);
+      line-height: 0.95;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
-      text-shadow: 0 0 18px rgba(56, 189, 248, 0.35);
+      font-weight: 900;
+      color: #f8fafc;
+      background: linear-gradient(180deg, #fef08a 0%, #facc15 38%, #f97316 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow:
+        0 3px 0 rgba(124, 45, 18, 0.9),
+        0 10px 24px rgba(249, 115, 22, 0.22),
+        0 0 18px rgba(250, 204, 21, 0.28);
+      filter: drop-shadow(0 0 14px rgba(250, 204, 21, 0.18));
+      transform-origin: center;
+    }
+
+    .start-title::after {
+      content: attr(data-title);
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      color: transparent;
+      -webkit-text-stroke: 3px rgba(15, 23, 42, 0.9);
+      text-shadow: 0 6px 16px rgba(0, 0, 0, 0.38);
+      pointer-events: none;
+    }
+
+
+    .overlay.start-screen .start-title {
+      animation: titleEntrance 680ms cubic-bezier(0.2, 0.9, 0.24, 1.15) both, titleGlow 2.6s ease-in-out 700ms infinite;
     }
 
     .start-text {
@@ -474,6 +530,12 @@
       display: inline-flex;
     }
 
+    @media (min-width: 769px) {
+      .hud {
+        display: none;
+      }
+    }
+
     @media (max-width: 768px) {
       body.mobile-ui {
         padding: 0;
@@ -525,8 +587,31 @@
         padding: 24px 20px;
       }
 
+      body.mobile-ui .mobile-lives {
+        top: 10px;
+        left: 10px;
+        gap: 4px;
+      }
+
+      body.mobile-ui .mobile-lives-label {
+        font-size: 12px;
+        filter: none;
+      }
+
+      body.mobile-ui .mobile-lives-value {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
       body.mobile-ui .start-title {
         font-size: clamp(28px, 8vw, 38px);
+        letter-spacing: 0.08em;
+        line-height: 1;
+      }
+
+      body.mobile-ui .start-title::after {
+        -webkit-text-stroke: 2px rgba(15, 23, 42, 0.9);
       }
     }
 
@@ -583,7 +668,7 @@
 
         <div class="overlay show" id="overlay">
           <div class="panel start-panel">
-            <h1 class="start-title" id="overlayTitle">LA BATALLA DEL PURIS</h1>
+            <h1 class="start-title" id="overlayTitle" data-title="LA BATALLA DEL PURIS">LA BATALLA DEL PURIS</h1>
             <p class="start-text" id="overlayText">
               Entrá en combate cuando estés listo. Al tocar JUGAR se intentará abrir el juego en fullscreen para aprovechar mejor la pantalla del celular.
             </p>
@@ -1160,19 +1245,20 @@
       running = false;
       isPaused = false;
       overlayTitle.textContent = "LA BATALLA DEL PURIS";
+      overlayTitle.dataset.title = "LA BATALLA DEL PURIS";
       overlayText.innerHTML = "Entrá en combate cuando estés listo.<br>Al tocar <strong>JUGAR</strong> se intentará abrir el juego en fullscreen para aprovechar mejor la pantalla del celular.";
       overlayExtra.hidden = true;
       overlayExtra.textContent = "";
       startBtn.textContent = "JUGAR";
       restartBtn.hidden = true;
-      overlay.classList.add("show");
+      overlay.classList.add("show", "start-screen");
       syncGameUiState();
     }
 
     function startGame() {
       resetGame();
       running = true;
-      overlay.classList.remove("show");
+      overlay.classList.remove("show", "start-screen");
       restartBtn.hidden = false;
       syncGameUiState();
       syncOrientationOverlay();
@@ -1193,6 +1279,7 @@
       updateHud();
       updatePauseButton();
       overlayTitle.textContent = "PURIS VS LAS MAQUINAS";
+      overlayTitle.dataset.title = "PURIS VS LAS MAQUINAS";
       overlayText.textContent = `Monedas: ${coins} | Tiempo: ${elapsedSeconds}s | Arma final: ${weaponLevel}`;
       overlayExtra.hidden = !finalVictoryAchieved;
       overlayExtra.innerHTML = finalVictoryAchieved
@@ -1201,6 +1288,7 @@
       startBtn.textContent = "Jugar de nuevo";
       restartBtn.hidden = false;
       overlay.classList.add("show");
+      overlay.classList.remove("start-screen");
       syncGameUiState();
     }
 
