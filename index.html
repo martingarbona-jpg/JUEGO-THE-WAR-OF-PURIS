@@ -1329,7 +1329,7 @@
       totalEnemyKills++;
       maybeSpawnRewardDrop(x - 14, y - 14);
 
-      if (totalEnemyKills >= 100 && !diamondUpgradeSpawned) {
+      if (totalEnemyKills >= 150 && !diamondUpgradeSpawned) {
         diamondUpgradeSpawned = true;
         spawnDiamondUpgrade(x - 16, y - 16);
       }
@@ -1461,7 +1461,7 @@
       loop();
     }
 
-    function endGame() {
+    function showFinalResultOverlay() {
       hideFinalBossCelebration();
       running = false;
       isPaused = false;
@@ -1486,6 +1486,10 @@
       overlay.classList.add("show");
       overlay.classList.remove("start-screen");
       syncGameUiState();
+    }
+
+    function endGame() {
+      showFinalResultOverlay();
     }
 
     function rectsCollide(a, b) {
@@ -1562,9 +1566,9 @@
       const enemyType = createSpecialEnemyType();
       const colors = enemyStyleByType(enemyType, tier);
       const horizontalSpeed = enemyType === "zigzag"
-        ? (Math.random() < 0.5 ? -1 : 1) * (0.55 + Math.random() * Math.max(0.28, enemyHorizontalFactor + 0.2))
+        ? (Math.random() < 0.5 ? -1 : 1) * (0.72 + Math.random() * Math.max(0.36, enemyHorizontalFactor + 0.28))
         : enemyType === "normal" && enemyHorizontalFactor > 0.32
-          ? (Math.random() < 0.35 ? (Math.random() < 0.5 ? -1 : 1) * (0.12 + enemyHorizontalFactor * 0.16) : 0)
+          ? (Math.random() < 0.48 ? (Math.random() < 0.5 ? -1 : 1) * (0.16 + enemyHorizontalFactor * 0.2) : 0)
           : 0;
 
       enemies.push({
@@ -1579,9 +1583,9 @@
         theme: currentBossTheme,
         dx: horizontalSpeed,
         enemyType,
-        fireCooldown: enemyType === "shooter" ? 78 + Math.floor(Math.random() * 36) : 0,
-        trackingStrength: enemyType === "tracker" ? 0.03 + Math.random() * 0.015 : 0,
-        trackingMax: enemyType === "tracker" ? 0.95 + Math.random() * 0.45 : 0,
+        fireCooldown: enemyType === "shooter" ? 68 + Math.floor(Math.random() * 28) : 0,
+        trackingStrength: enemyType === "tracker" ? 0.038 + Math.random() * 0.018 : 0,
+        trackingMax: enemyType === "tracker" ? 1.08 + Math.random() * 0.5 : 0,
         kamikazeRange: enemyType === "kamikaze" ? 116 : 0,
         explosionRadius: enemyType === "kamikaze" ? 52 : 0,
         warningTimer: 0,
@@ -1668,9 +1672,9 @@
 
       const moveSpeed =
         bossIndex === 1 ? 1.15 :
-        bossIndex === 2 ? 1.52 :
-        bossIndex === 3 ? 1.82 :
-        2.15;
+        bossIndex === 2 ? 1.62 :
+        bossIndex === 3 ? 2.08 :
+        2.48;
 
       boss = {
         type: bossIndex,
@@ -1885,8 +1889,8 @@
       animateFinalBossCelebration();
       celebrationTimeoutId = setTimeout(() => {
         celebrationTimeoutId = null;
-        endGame();
-      }, 2800);
+        showFinalResultOverlay();
+      }, 3200);
     }
 
     function triggerBossIntro(bossIndex) {
@@ -1977,29 +1981,29 @@
 
         if (e.enemyType === "tracker") {
           const follow = clamp((playerCenter - enemyCenter) * e.trackingStrength, -e.trackingMax, e.trackingMax);
-          e.x += follow + Math.sin((frame + i * 9) * 0.045 + e.driftPhase) * 0.24;
+          e.x += follow + Math.sin((frame + i * 9) * 0.055 + e.driftPhase) * 0.34;
         } else if (e.enemyType === "shooter") {
-          e.x += Math.sin((frame + i * 11) * 0.045 + e.driftPhase) * 0.65;
-          e.warningTimer = e.fireCooldown < 22 ? e.fireCooldown : 0;
+          e.x += Math.sin((frame + i * 11) * 0.058 + e.driftPhase) * 0.9;
+          e.warningTimer = e.fireCooldown < 20 ? e.fireCooldown : 0;
           e.fireCooldown--;
           if (e.fireCooldown <= 0 && enemyBullets.length < 12) {
             enemyBullets.push({
               x: e.x + e.w / 2,
               y: e.y + e.h,
               r: 5,
-              dx: (playerCenter - enemyCenter) * 0.006,
-              dy: 2.9 + Math.min(1.45, elapsedSeconds * 0.012),
+              dx: (playerCenter - enemyCenter) * 0.007,
+              dy: 3.15 + Math.min(1.6, elapsedSeconds * 0.014),
               color: "#fdba74"
             });
-            e.fireCooldown = 92 + Math.floor(Math.random() * 34);
+            e.fireCooldown = 82 + Math.floor(Math.random() * 28);
           }
         } else if (e.enemyType === "kamikaze") {
-          const homingStrength = verticalDistance < 200 ? 0.09 : 0.042;
-          const maxShift = verticalDistance < 200 ? 1.7 : 1.05;
+          const homingStrength = verticalDistance < 200 ? 0.102 : 0.05;
+          const maxShift = verticalDistance < 200 ? 1.95 : 1.22;
           const follow = clamp((playerCenter - enemyCenter) * homingStrength, -maxShift, maxShift);
           e.x += follow;
           if (verticalDistance < 240) {
-            e.y += 0.62;
+            e.y += 0.74;
             e.warningTimer = Math.min(24, e.warningTimer + 1);
           } else {
             e.warningTimer = Math.max(0, e.warningTimer - 1);
@@ -2012,7 +2016,7 @@
         } else {
           e.x += e.dx;
           if (e.enemyType === "normal" && e.dx === 0 && enemyHorizontalFactor > 0.4) {
-            e.x += Math.sin((frame + i * 7) * 0.03 + e.driftPhase) * 0.22;
+            e.x += Math.sin((frame + i * 7) * 0.042 + e.driftPhase) * 0.34;
           }
         }
 
@@ -2152,9 +2156,9 @@
         fireBossPattern();
         boss.fireCooldown =
           boss.type === 1 ? 124 :
-          boss.type === 2 ? 88 :
-          boss.type === 3 ? 68 :
-          54;
+          boss.type === 2 ? 78 :
+          boss.type === 3 ? 54 :
+          42;
       }
     }
 
@@ -2174,16 +2178,16 @@
         radius = 6;
       } else if (boss.type === 2) {
         pattern = [-0.58, -0.2, 0.2, 0.58];
-        speed = 1.62;
+        speed = 1.74;
         radius = 6;
       } else if (boss.type === 3) {
-        pattern = [-0.72, -0.3, 0, 0.3, 0.72];
-        speed = 1.86;
+        pattern = [-0.84, -0.42, 0, 0.42, 0.84];
+        speed = 2.06;
         radius = 7;
       } else {
-        pattern = [-0.9, -0.56, -0.22, 0.22, 0.56, 0.9];
-        speed = 2.08;
-        radius = 7;
+        pattern = [-1.04, -0.7, -0.34, 0, 0.34, 0.7, 1.04];
+        speed = 2.34;
+        radius = 8;
       }
 
       for (const angle of pattern) {
@@ -2376,15 +2380,15 @@
       autoFireRate = Math.max(8, 13 - Math.floor(stage / 4));
 
       if (elapsedSeconds < 20) {
-        enemyHorizontalFactor = 0.08;
+        enemyHorizontalFactor = 0.14;
       } else if (elapsedSeconds < 45) {
-        enemyHorizontalFactor = 0.48;
+        enemyHorizontalFactor = 0.58;
       } else if (elapsedSeconds < 80) {
-        enemyHorizontalFactor = 0.86;
+        enemyHorizontalFactor = 0.98;
       } else if (elapsedSeconds < 130) {
-        enemyHorizontalFactor = 1.16;
+        enemyHorizontalFactor = 1.3;
       } else {
-        enemyHorizontalFactor = 1.42;
+        enemyHorizontalFactor = 1.62;
       }
     }
 
