@@ -1782,11 +1782,12 @@
       currentBossTheme = bossIndex;
       triggerBossIntro(bossIndex);
 
+      // Ajuste puntual del boss final: -8% de vida y una pausa apenas mayor entre ráfagas.
       const hp =
         bossIndex === 1 ? 200 :
         bossIndex === 2 ? 750 :
         bossIndex === 3 ? 1200 :
-        2000;
+        1840;
 
       const moveSpeed =
         bossIndex === 1 ? 1.15 :
@@ -2279,7 +2280,7 @@
           boss.type === 1 ? 124 :
           boss.type === 2 ? 78 :
           boss.type === 3 ? 66 :
-          46;
+          50;
         boss.fireCooldown = Math.max(20, Math.round(baseCooldown / bossAggressionMultiplier(boss.type)));
       }
     }
