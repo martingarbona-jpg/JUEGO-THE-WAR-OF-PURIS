@@ -830,6 +830,7 @@
     let audioCtx = null;
     let audioReady = false;
     let lastEnemyExplosionAt = 0;
+    let lastHitSoundAt = 0;
     let lastStageWidth = 0;
     let lastStageHeight = 0;
     let autoPausedByOrientation = false;
@@ -1165,6 +1166,59 @@
       if (audioCtx.currentTime - lastEnemyExplosionAt < 0.06) return;
       lastEnemyExplosionAt = audioCtx.currentTime;
       playSynthExplosion("enemy");
+    }
+
+    function playHitSound(targetType = "enemy") {
+      if (!audioCtx) return;
+
+      const now = audioCtx.currentTime;
+      if (now - lastHitSoundAt < 0.035) return;
+      lastHitSoundAt = now;
+
+      const isBoss = targetType === "boss";
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      const filter = audioCtx.createBiquadFilter();
+      const endTime = now + (isBoss ? 0.06 : 0.045);
+
+      osc.type = isBoss ? "triangle" : "square";
+      osc.frequency.setValueAtTime(isBoss ? 420 : 620, now);
+      osc.frequency.exponentialRampToValueAtTime(isBoss ? 210 : 300, endTime);
+
+      filter.type = "bandpass";
+      filter.Q.setValueAtTime(isBoss ? 1.1 : 1.4, now);
+      filter.frequency.setValueAtTime(isBoss ? 900 : 1400, now);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(isBoss ? 0.032 : 0.022, now + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start(now);
+      osc.stop(endTime + 0.01);
+
+      if (isBoss) {
+        const thumpOsc = audioCtx.createOscillator();
+        const thumpGain = audioCtx.createGain();
+        const thumpEnd = now + 0.05;
+
+        thumpOsc.type = "sine";
+        thumpOsc.frequency.setValueAtTime(120, now);
+        thumpOsc.frequency.exponentialRampToValueAtTime(75, thumpEnd);
+
+        thumpGain.gain.setValueAtTime(0.0001, now);
+        thumpGain.gain.exponentialRampToValueAtTime(0.014, now + 0.004);
+        thumpGain.gain.exponentialRampToValueAtTime(0.0001, thumpEnd);
+
+        thumpOsc.connect(thumpGain);
+        thumpGain.connect(audioCtx.destination);
+
+        thumpOsc.start(now);
+        thumpOsc.stop(thumpEnd + 0.01);
+      }
     }
 
     function playBossExplosionSound() {
@@ -2292,6 +2346,7 @@
           const e = enemies[j];
           if (rectsCollide(b, e)) {
             e.hp -= b.damage;
+            playHitSound("enemy");
 
             if (b.type !== "laser-red" && b.type !== "laser-gold" && b.type !== "laser-diamond") {
               bullets.splice(i, 1);
@@ -2319,6 +2374,7 @@
         const b = bullets[i];
         if (rectsCollide(b, boss)) {
           boss.hp -= b.damage;
+          playHitSound("boss");
 
           if (b.type !== "laser-red" && b.type !== "laser-gold" && b.type !== "laser-diamond") {
             bullets.splice(i, 1);
