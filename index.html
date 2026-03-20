@@ -744,7 +744,7 @@
     const moveLeftBtn = document.getElementById("moveLeftBtn");
     const moveRightBtn = document.getElementById("moveRightBtn");
 
-    const UPGRADE_STEPS = [35, 100, 200, 400];
+    const UPGRADE_STEPS = [35, 100, 200, 300];
     const FIRST_BOSS_TIME = 30;
     const SECOND_BOSS_DELAY_AFTER_KILL = 30;
     const THIRD_BOSS_DELAY_AFTER_KILL = 30;
@@ -823,6 +823,7 @@
     let advancedEnemiesUnlocked = false;
     let diamondUpgradeSpawned = false;
     let diamondMode = false;
+    let postBoss3DifficultyUnlocked = false;
     let shieldActive = false;
     let shieldTimer = 0;
     let screenShake = 0;
@@ -1144,11 +1145,36 @@
     }
 
     function maxWeaponLevelAvailableByCoins() {
-      if (coins >= 400) return 5;
+      if (coins >= 300) return 5;
       if (coins >= 200) return 4;
       if (coins >= 100) return 3;
       if (coins >= 35) return 2;
       return 1;
+    }
+
+    function spawnPressureMultiplier() {
+      let multiplier = 1;
+
+      if (advancedEnemiesUnlocked) multiplier *= 1.1;
+      if (postBoss3DifficultyUnlocked) multiplier *= 1.2;
+      if (diamondMode) multiplier *= 1.15;
+
+      return multiplier;
+    }
+
+    function globalHorizontalMultiplier() {
+      return advancedEnemiesUnlocked ? 1.1 : 1;
+    }
+
+    function maxSpecialEnemiesAllowed() {
+      return postBoss3DifficultyUnlocked ? 5 : 4;
+    }
+
+    function bossAggressionMultiplier(type) {
+      if (type === 1) return 1.03;
+      if (type === 2) return 1.1;
+      if (type === 3) return 1.2;
+      return 1.28;
     }
 
     function weaponDamage(level) {
@@ -1252,21 +1278,22 @@
       const trackerCount = enemies.filter(enemy => enemy.enemyType === "tracker").length;
       const shooterCount = enemies.filter(enemy => enemy.enemyType === "shooter").length;
       const kamikazeCount = enemies.filter(enemy => enemy.enemyType === "kamikaze").length;
+      const maxSpecialEnemies = maxSpecialEnemiesAllowed();
       const zigzagChance = enemyHorizontalFactor > 0 ? 0.38 : 0.2;
 
       if (!advancedEnemiesUnlocked) {
         return Math.random() < zigzagChance ? "zigzag" : "normal";
       }
 
-      if (roll < 0.10 && trackerCount < 2 && specialEnemies.length < 4) {
+      if (roll < 0.10 && trackerCount < 2 && specialEnemies.length < maxSpecialEnemies) {
         return "tracker";
       }
 
-      if (roll < 0.20 && shooterCount < 2 && specialEnemies.length < 4) {
+      if (roll < 0.20 && shooterCount < 2 && specialEnemies.length < maxSpecialEnemies) {
         return "shooter";
       }
 
-      if (roll < 0.30 && kamikazeCount < 2 && specialEnemies.length < 4) {
+      if (roll < 0.30 && kamikazeCount < 2 && specialEnemies.length < maxSpecialEnemies) {
         return "kamikaze";
       }
 
@@ -1311,12 +1338,12 @@
     }
 
     function maybeSpawnRewardDrop(x, y) {
-      if (normalEnemyKills > 0 && normalEnemyKills % 25 === 0) {
+      if (normalEnemyKills > 0 && normalEnemyKills % 30 === 0) {
         spawnLifeDrop(x, y);
         return;
       }
 
-      if (normalEnemyKills > 0 && normalEnemyKills % 10 === 0) {
+      if (normalEnemyKills > 0 && normalEnemyKills % 12 === 0) {
         spawnShieldDrop(x, y);
       }
     }
@@ -1394,6 +1421,7 @@
       advancedEnemiesUnlocked = false;
       diamondUpgradeSpawned = false;
       diamondMode = false;
+      postBoss3DifficultyUnlocked = false;
       shieldActive = false;
       shieldTimer = 0;
       screenShake = 0;
@@ -1565,11 +1593,13 @@
       const x = Math.random() * (canvas.width - w);
       const enemyType = createSpecialEnemyType();
       const colors = enemyStyleByType(enemyType, tier);
+      const horizontalMultiplier = globalHorizontalMultiplier();
       const horizontalSpeed = enemyType === "zigzag"
-        ? (Math.random() < 0.5 ? -1 : 1) * (0.72 + Math.random() * Math.max(0.36, enemyHorizontalFactor + 0.28))
+        ? (Math.random() < 0.5 ? -1 : 1) * (0.72 + Math.random() * Math.max(0.36, enemyHorizontalFactor + 0.28)) * 1.15 * horizontalMultiplier
         : enemyType === "normal" && enemyHorizontalFactor > 0.32
-          ? (Math.random() < 0.48 ? (Math.random() < 0.5 ? -1 : 1) * (0.16 + enemyHorizontalFactor * 0.2) : 0)
+          ? (Math.random() < 0.48 ? (Math.random() < 0.5 ? -1 : 1) * (0.16 + enemyHorizontalFactor * 0.2) * horizontalMultiplier : 0)
           : 0;
+      const baseSpeed = enemyBaseSpeed + Math.random() * 0.7 + tier * 0.09 + (enemyType === "kamikaze" ? 0.38 : enemyType === "tracker" ? 0.12 : 0);
 
       enemies.push({
         x,
@@ -1578,15 +1608,15 @@
         h,
         hp: tier,
         maxHp: tier,
-        speed: enemyBaseSpeed + Math.random() * 0.7 + tier * 0.09 + (enemyType === "kamikaze" ? 0.38 : enemyType === "tracker" ? 0.12 : 0),
+        speed: enemyType === "kamikaze" ? baseSpeed * 1.1 : baseSpeed,
         colors,
         theme: currentBossTheme,
         dx: horizontalSpeed,
         enemyType,
         fireCooldown: enemyType === "shooter" ? 68 + Math.floor(Math.random() * 28) : 0,
-        trackingStrength: enemyType === "tracker" ? 0.038 + Math.random() * 0.018 : 0,
-        trackingMax: enemyType === "tracker" ? 1.08 + Math.random() * 0.5 : 0,
-        kamikazeRange: enemyType === "kamikaze" ? 116 : 0,
+        trackingStrength: enemyType === "tracker" ? (0.038 + Math.random() * 0.018) * 1.12 : 0,
+        trackingMax: enemyType === "tracker" ? (1.08 + Math.random() * 0.5) * 1.12 : 0,
+        kamikazeRange: enemyType === "kamikaze" ? 120 : 0,
         explosionRadius: enemyType === "kamikaze" ? 52 : 0,
         warningTimer: 0,
         driftPhase: Math.random() * Math.PI * 2
@@ -1675,6 +1705,7 @@
         bossIndex === 2 ? 1.62 :
         bossIndex === 3 ? 2.08 :
         2.48;
+      const aggressionMultiplier = bossAggressionMultiplier(bossIndex);
 
       boss = {
         type: bossIndex,
@@ -1687,7 +1718,7 @@
         maxHp: hp,
         arriveSpeed: 1.5,
         moveDir: 1,
-        moveSpeed,
+        moveSpeed: moveSpeed * (1 + (aggressionMultiplier - 1) * 0.6),
         fireCooldown: 0
       };
     }
@@ -1983,7 +2014,7 @@
           const follow = clamp((playerCenter - enemyCenter) * e.trackingStrength, -e.trackingMax, e.trackingMax);
           e.x += follow + Math.sin((frame + i * 9) * 0.055 + e.driftPhase) * 0.34;
         } else if (e.enemyType === "shooter") {
-          e.x += Math.sin((frame + i * 11) * 0.058 + e.driftPhase) * 0.9;
+          e.x += Math.sin((frame + i * 11) * 0.062 + e.driftPhase) * 1.02;
           e.warningTimer = e.fireCooldown < 20 ? e.fireCooldown : 0;
           e.fireCooldown--;
           if (e.fireCooldown <= 0 && enemyBullets.length < 12) {
@@ -1998,12 +2029,12 @@
             e.fireCooldown = 82 + Math.floor(Math.random() * 28);
           }
         } else if (e.enemyType === "kamikaze") {
-          const homingStrength = verticalDistance < 200 ? 0.102 : 0.05;
-          const maxShift = verticalDistance < 200 ? 1.95 : 1.22;
+          const homingStrength = (verticalDistance < 200 ? 0.102 : 0.05) * 1.1;
+          const maxShift = (verticalDistance < 200 ? 1.95 : 1.22) * 1.1;
           const follow = clamp((playerCenter - enemyCenter) * homingStrength, -maxShift, maxShift);
           e.x += follow;
           if (verticalDistance < 240) {
-            e.y += 0.74;
+            e.y += 0.82;
             e.warningTimer = Math.min(24, e.warningTimer + 1);
           } else {
             e.warningTimer = Math.max(0, e.warningTimer - 1);
@@ -2154,11 +2185,12 @@
       boss.fireCooldown--;
       if (boss.fireCooldown <= 0) {
         fireBossPattern();
-        boss.fireCooldown =
+        const baseCooldown =
           boss.type === 1 ? 124 :
           boss.type === 2 ? 78 :
           boss.type === 3 ? 54 :
           42;
+        boss.fireCooldown = Math.max(20, Math.round(baseCooldown / bossAggressionMultiplier(boss.type)));
       }
     }
 
@@ -2189,6 +2221,8 @@
         speed = 2.34;
         radius = 8;
       }
+
+      speed *= 1 + (bossAggressionMultiplier(boss.type) - 1) * 0.55;
 
       for (const angle of pattern) {
         bossBullets.push({
@@ -2276,6 +2310,7 @@
               advancedEnemiesUnlocked = true;
               pendingBoss3At = elapsedSeconds + THIRD_BOSS_DELAY_AFTER_KILL;
             } else if (defeatedBossType === 3) {
+              postBoss3DifficultyUnlocked = true;
               pendingBoss4At = elapsedSeconds + FOURTH_BOSS_DELAY_AFTER_KILL;
             }
 
@@ -2373,10 +2408,11 @@
 
     function updateDifficulty() {
       const stage = Math.floor(elapsedSeconds / 18);
-      const bossPressure = bossesSpawned.has(3) ? 4 : advancedEnemiesUnlocked ? 2 : 0;
+      const baseSpawnRate = 54 - stage * 2;
+      const speedMultiplier = diamondMode ? 1.1 : 1;
 
-      enemyBaseSpeed = 1.65 + stage * 0.08 + (advancedEnemiesUnlocked ? 0.08 : 0);
-      enemySpawnRate = Math.max(16, 54 - stage * 2 - bossPressure);
+      enemyBaseSpeed = (1.65 + stage * 0.08 + (advancedEnemiesUnlocked ? 0.08 : 0)) * speedMultiplier;
+      enemySpawnRate = Math.max(12, Math.round(baseSpawnRate / spawnPressureMultiplier()));
       autoFireRate = Math.max(8, 13 - Math.floor(stage / 4));
 
       if (elapsedSeconds < 20) {
@@ -2390,6 +2426,8 @@
       } else {
         enemyHorizontalFactor = 1.62;
       }
+
+      enemyHorizontalFactor *= globalHorizontalMultiplier();
     }
 
     function updateBest() {
