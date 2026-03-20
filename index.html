@@ -10,6 +10,8 @@
     html,
     body {
       min-height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
     }
 
     body {
@@ -23,6 +25,7 @@
       align-items: center;
       justify-content: center;
       padding: 10px;
+      touch-action: none;
     }
 
     .wrap {
@@ -102,6 +105,42 @@
       border: none;
       background: rgba(0,0,0,0.5);
       color: white;
+    }
+
+    .mobile-lives {
+      display: none;
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1001;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(2, 6, 23, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+      pointer-events: none;
+      backdrop-filter: blur(4px);
+    }
+
+    .mobile-lives-label {
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .mobile-lives-value {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      color: #fff;
+    }
+
+    .overlay-extra {
+      margin: 0 0 18px;
+      color: #f8fafc;
+      font-size: 15px;
+      line-height: 1.5;
     }
 
     canvas {
@@ -381,88 +420,63 @@
     }
 
     @media (max-width: 768px) {
-      body {
-        padding: 4px;
-        align-items: flex-start;
-      }
-
-      .wrap {
-        min-height: calc(100dvh - 8px);
-        gap: 4px;
-      }
-
-      .canvas-box {
-        flex: 1;
-        min-height: 0;
-      }
-
-      canvas {
-        min-height: 0;
-        border-radius: 14px;
-      }
-
-      #pauseBtn {
-        top: 8px;
-        right: 8px;
-        font-size: 17px;
-        padding: 7px 11px;
-      }
-
-      .help {
-        margin-top: 0;
-        font-size: 10px;
-        line-height: 1.2;
-      }
-    }
-
-    @media (max-width: 768px) and (orientation: landscape) {
-      body {
+      body.mobile-ui {
         padding: 0;
         align-items: stretch;
       }
 
-      .wrap {
+      body.mobile-ui .wrap {
         width: 100%;
         min-height: 100dvh;
         gap: 0;
       }
 
-      .canvas-box {
+      body.mobile-ui .canvas-box {
+        flex: 1;
         min-height: 100dvh;
       }
 
-      .hud {
+      body.mobile-ui .hud {
+        display: none;
+      }
+
+      body.mobile-ui .mobile-lives {
+        display: inline-flex;
+      }
+
+      body.mobile-ui canvas {
+        min-height: 0;
+        border-radius: 0;
+        border: none;
+        box-shadow: none;
+      }
+
+      body.mobile-ui #pauseBtn {
+        top: 8px;
+        right: 8px;
+        font-size: 16px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: rgba(2, 6, 23, 0.58);
+      }
+
+      body.mobile-ui .help {
+        display: none;
+      }
+    }
+
+    @media (max-width: 768px) and (orientation: landscape) {
+      body.mobile-ui .mobile-lives {
         top: 8px;
         left: 8px;
-        right: 56px;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 4px;
+        padding: 5px 9px;
       }
 
-      .card {
-        padding: 4px 5px;
-        border-radius: 8px;
-        background: rgba(2, 6, 23, 0.28);
-      }
-
-      .label {
-        font-size: 8px;
-        margin-bottom: 1px;
-      }
-
-      .value {
-        font-size: 11px;
-      }
-
-      #pauseBtn {
+      body.mobile-ui #pauseBtn {
         top: 6px;
         right: 6px;
-        font-size: 16px;
+        font-size: 15px;
         padding: 6px 9px;
-      }
-
-      .help {
-        display: none;
       }
     }
   </style>
@@ -472,6 +486,10 @@
     <div class="canvas-box">
       <div class="stage" id="stage">
         <canvas id="game" width="900" height="540"></canvas>
+        <div class="mobile-lives" id="mobileLives" aria-label="Vidas">
+          <span class="mobile-lives-label" aria-hidden="true">❤️</span>
+          <span class="mobile-lives-value" id="mobileLivesValue">3</span>
+        </div>
         <div class="hud">
           <div class="card">
             <span class="label">Monedas</span>
@@ -513,6 +531,7 @@
               Boss 3 a los 60 segundos de matar al Boss 2.<br>
               La W mejora el arma y también transforma la nave.
             </p>
+            <p class="overlay-extra" id="overlayExtra" hidden></p>
             <div class="btns">
               <button class="btn-primary" id="startBtn">Empezar</button>
               <button class="btn-secondary" id="restartBtn">Reiniciar</button>
@@ -561,10 +580,12 @@
     const nextUpgradeEl = document.getElementById("nextUpgrade");
     const nextBossEl = document.getElementById("nextBoss");
     const timeEl = document.getElementById("time");
+    const mobileLivesValueEl = document.getElementById("mobileLivesValue");
 
     const overlay = document.getElementById("overlay");
     const overlayTitle = document.getElementById("overlayTitle");
     const overlayText = document.getElementById("overlayText");
+    const overlayExtra = document.getElementById("overlayExtra");
     const startBtn = document.getElementById("startBtn");
     const restartBtn = document.getElementById("restartBtn");
     const orientationOverlay = document.getElementById("orientationOverlay");
@@ -642,6 +663,7 @@
     let celebrationAnimationId = null;
     let celebrationTimeoutId = null;
     let celebrationParticles = [];
+    let finalVictoryAchieved = false;
 
 
     function clamp(value, min, max) {
@@ -689,7 +711,12 @@
       return MOBILE_BREAKPOINT.matches ? MOBILE_WORLD : DESKTOP_WORLD;
     }
 
+    function syncMobileViewportState() {
+      document.body.classList.toggle("mobile-ui", isMobileDevice());
+    }
+
     function resizeCanvas() {
+      syncMobileViewportState();
       syncOrientationOverlay();
       const rect = canvasBox.getBoundingClientRect();
       const { width: nextWidth, height: nextHeight } = getTargetWorldSize();
@@ -958,6 +985,7 @@
       coinsEl.textContent = coins;
       bestEl.textContent = bestCoins;
       livesEl.textContent = lives;
+      mobileLivesValueEl.textContent = lives;
       weaponEl.textContent = weaponLevel;
       nextUpgradeEl.textContent = nextUpgradeTarget();
       timeEl.textContent = `${elapsedSeconds}s`;
@@ -1008,6 +1036,7 @@
       coins = 0;
       lives = 3;
       weaponLevel = 1;
+      finalVictoryAchieved = false;
 
       enemySpawnRate = 52;
       enemyBaseSpeed = 1.65;
@@ -1064,6 +1093,10 @@
       updatePauseButton();
       overlayTitle.textContent = "PURIS VS LAS MAQUINAS";
       overlayText.textContent = `Monedas: ${coins} | Tiempo: ${elapsedSeconds}s | Arma final: ${weaponLevel}`;
+      overlayExtra.hidden = !finalVictoryAchieved;
+      overlayExtra.innerHTML = finalVictoryAchieved
+        ? 'Desarrollado por <strong>"Tu padre"</strong> para <strong>"Su preferido"</strong> ❤️ Te amo'
+        : "";
       startBtn.textContent = "Jugar de nuevo";
       overlay.classList.add("show");
     }
@@ -1674,6 +1707,7 @@
             bossBullets = [];
 
             if (defeatedBossType === 4) {
+              finalVictoryAchieved = true;
               triggerFinalBossCelebration();
               return;
             }
@@ -2324,6 +2358,12 @@
     if (window.visualViewport) {
       window.visualViewport.addEventListener("resize", resizeCanvas);
     }
+
+    document.addEventListener("touchmove", (event) => {
+      if (!isMobileDevice()) return;
+      if (event.target.closest("#stage") || event.target.closest("#pauseBtn")) return;
+      event.preventDefault();
+    }, { passive: false });
 
     resetGame();
   </script>
