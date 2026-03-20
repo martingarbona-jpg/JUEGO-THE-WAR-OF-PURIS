@@ -56,6 +56,19 @@
       position: relative;
     }
 
+    #pauseBtn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      font-size: 20px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: none;
+      background: rgba(0,0,0,0.5);
+      color: white;
+    }
+
     canvas {
       width: 100%;
       display: block;
@@ -176,14 +189,38 @@
 
       .hud {
         grid-template-columns: repeat(2, 1fr);
+        gap: 4px;
+        padding: 4px;
       }
 
-      .value {
-        font-size: 16px;
+      .hud .card,
+      .hud-box {
+        padding: 4px;
+        font-size: 11px;
+      }
+
+      .hud .label,
+      .hud-box span {
+        font-size: 9px;
+        margin-bottom: 2px;
+      }
+
+      .hud .value,
+      .hud-box strong {
+        font-size: 13px;
       }
 
       canvas {
+        width: 100%;
+        height: 65vh;
         max-height: none;
+      }
+
+      #pauseBtn {
+        top: 8px;
+        right: 8px;
+        font-size: 18px;
+        padding: 8px 12px;
       }
 
       .mobile-controls {
@@ -227,6 +264,7 @@
 
     <div class="canvas-box">
       <canvas id="game" width="900" height="540"></canvas>
+      <button id="pauseBtn" type="button" aria-label="Pausar juego">⏸</button>
 
       <div class="overlay show" id="overlay">
         <div class="panel">
@@ -275,6 +313,7 @@
 
     const leftBtn = document.getElementById("leftBtn");
     const rightBtn = document.getElementById("rightBtn");
+    const pauseBtn = document.getElementById("pauseBtn");
 
     const UPGRADE_STEPS = [25, 75, 150, 300, 600];
     const FIRST_BOSS_TIME = 30;
@@ -284,6 +323,7 @@
 
     let animationId = null;
     let running = false;
+    let isPaused = false;
     let frame = 0;
     let elapsedSeconds = 0;
     let secondTimer = 0;
@@ -326,6 +366,61 @@
     let currentBossTheme = 1;
     let bossIntroTimer = 0;
     let bossIntroLabel = "";
+
+
+    function createToneDataUrl(frequency, duration, volume = 0.35) {
+      const sampleRate = 22050;
+      const sampleCount = Math.max(1, Math.floor(sampleRate * duration));
+      const buffer = new ArrayBuffer(44 + sampleCount * 2);
+      const view = new DataView(buffer);
+      const writeString = (offset, value) => {
+        for (let i = 0; i < value.length; i++) view.setUint8(offset + i, value.charCodeAt(i));
+      };
+
+      writeString(0, "RIFF");
+      view.setUint32(4, 36 + sampleCount * 2, true);
+      writeString(8, "WAVE");
+      writeString(12, "fmt ");
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeString(36, "data");
+      view.setUint32(40, sampleCount * 2, true);
+
+      for (let i = 0; i < sampleCount; i++) {
+        const t = i / sampleRate;
+        const fade = 1 - i / sampleCount;
+        const sample = Math.sin(2 * Math.PI * frequency * t) * volume * fade;
+        view.setInt16(44 + i * 2, sample * 0x7fff, true);
+      }
+
+      let binary = "";
+      const bytes = new Uint8Array(buffer);
+      const chunkSize = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+      }
+      return `data:audio/wav;base64,${btoa(binary)}`;
+    }
+
+    const sShoot = new Audio(createToneDataUrl(880, 0.05, 0.22));
+    const sKill = new Audio(createToneDataUrl(220, 0.08, 0.28));
+    const sBossSpawn = new Audio(createToneDataUrl(140, 0.35, 0.32));
+    const sBossDie = new Audio(createToneDataUrl(110, 0.5, 0.34));
+
+    sShoot.volume = 0.3;
+    sKill.volume = 0.35;
+    sBossSpawn.volume = 0.45;
+    sBossDie.volume = 0.5;
+
+    function playSound(audio, restart = true) {
+      if (restart) audio.currentTime = 0;
+      audio.play().catch(() => {});
+    }
 
     function maxWeaponLevelAvailableByCoins() {
       if (coins >= 300) return 5;
@@ -395,6 +490,7 @@
     function resetGame() {
       cancelAnimationFrame(animationId);
       running = false;
+      isPaused = false;
       frame = 0;
       elapsedSeconds = 0;
       secondTimer = 0;
@@ -431,6 +527,7 @@
       pendingBoss4At = null;
 
       updateHud();
+      updatePauseButton();
       draw();
     }
 
@@ -443,6 +540,7 @@
 
     function endGame() {
       running = false;
+      isPaused = false;
       cancelAnimationFrame(animationId);
 
       if (coins > bestCoins) {
@@ -451,6 +549,7 @@
       }
 
       updateHud();
+      updatePauseButton();
       overlayTitle.textContent = "PURIS VS LAS MAQUINAS";
       overlayText.textContent = `Monedas: ${coins} | Tiempo: ${elapsedSeconds}s | Arma final: ${weaponLevel}`;
       startBtn.textContent = "Jugar de nuevo";
@@ -650,11 +749,14 @@
     function triggerBossIntro(bossIndex) {
       bossIntroTimer = bossIndex === 4 ? 180 : 90;
       bossIntroLabel = bossIndex === 4 ? "⚠ BOSS 4 - OMEGA" : `BOSS ${bossIndex}`;
+      playSound(sBossSpawn, false);
     }
 
     function fireWeapon() {
       const dmg = weaponDamage(weaponLevel);
       const centerX = player.x + player.w / 2;
+
+      playSound(sShoot);
 
       if (weaponLevel === 1) {
         bullets.push({ x: centerX - 3, y: player.y - 10, w: 6, h: 16, speed: 8, damage: dmg, type: "normal", color: "#38bdf8" });
@@ -868,6 +970,7 @@
             if (e.hp <= 0) {
               createExplosion(e.x + e.w / 2, e.y + e.h / 2, 14, e.colors.fill);
               spawnCoin(e.x + e.w / 2 - 11, e.y + e.h / 2 - 11, e.maxHp);
+              playSound(sKill);
               enemies.splice(j, 1);
             }
             break;
@@ -897,6 +1000,7 @@
           if (boss.hp <= 0) {
             const defeatedBossType = boss.type;
 
+            playSound(sBossDie, false);
             createExplosion(boss.x + boss.w / 2, boss.y + boss.h / 2, 40, "#f59e0b");
             for (let n = 0; n < 6; n++) {
               spawnCoin(
@@ -1438,6 +1542,17 @@
       ctx.restore();
     }
 
+    function drawPause() {
+      ctx.save();
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "white";
+      ctx.font = "40px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("PAUSA", canvas.width / 2, canvas.height / 2);
+      ctx.restore();
+    }
+
     function draw() {
       drawBackground();
       drawCoinDrops();
@@ -1453,9 +1568,27 @@
 
     function loop() {
       if (!running) return;
+
+      if (isPaused) {
+        draw();
+        drawPause();
+        animationId = requestAnimationFrame(loop);
+        return;
+      }
+
       update();
       draw();
       animationId = requestAnimationFrame(loop);
+    }
+
+    function updatePauseButton() {
+      pauseBtn.textContent = isPaused ? "▶" : "⏸";
+    }
+
+    function togglePause() {
+      if (!running) return;
+      isPaused = !isPaused;
+      updatePauseButton();
     }
 
     function pressLeft() {
@@ -1471,6 +1604,12 @@
     }
 
     document.addEventListener("keydown", (e) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+        togglePause();
+        return;
+      }
+
       const k = e.key.toLowerCase();
       if (k === "arrowleft" || k === "a") pressLeft();
       if (k === "arrowright" || k === "d") pressRight();
@@ -1492,6 +1631,8 @@
     rightBtn.addEventListener("mousedown", pressRight);
     rightBtn.addEventListener("mouseup", releaseMove);
     rightBtn.addEventListener("mouseleave", releaseMove);
+
+    pauseBtn.onclick = togglePause;
 
     startBtn.addEventListener("click", startGame);
     restartBtn.addEventListener("click", startGame);
