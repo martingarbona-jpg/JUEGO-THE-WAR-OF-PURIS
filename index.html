@@ -828,8 +828,6 @@
     let bossIntroTimer = 0;
     let bossIntroLabel = "";
     let audioCtx = null;
-    let bgmGain = null;
-    let bgmSource = null;
     let audioReady = false;
     let lastEnemyExplosionAt = 0;
     let lastStageWidth = 0;
@@ -1081,46 +1079,57 @@
       }
 
       audioCtx = new AudioContextClass();
-      bgmGain = audioCtx.createGain();
-      bgmGain.gain.value = 0.15;
-      bgmGain.connect(audioCtx.destination);
       audioReady = true;
-      startBgmLoop();
     }
 
-    function createArcadeLoopBuffer() {
-      const sampleRate = audioCtx.sampleRate;
-      const beat = 0.25;
-      const sequence = [261.63, 392.0, 329.63, 523.25, 293.66, 440.0, 349.23, 587.33];
-      const duration = sequence.length * beat;
-      const buffer = audioCtx.createBuffer(1, Math.floor(sampleRate * duration), sampleRate);
-      const channel = buffer.getChannelData(0);
+    function playArcadeStinger(notes, volume = 0.05, wave = "square") {
+      if (!audioCtx || !notes.length) return;
 
-      for (let i = 0; i < channel.length; i++) {
-        const t = i / sampleRate;
-        const noteIndex = Math.min(sequence.length - 1, Math.floor(t / beat));
-        const noteTime = t - noteIndex * beat;
-        const env = Math.max(0, 1 - noteTime / beat) ** 1.6;
-        const freq = sequence[noteIndex];
-        const toneA = Math.sin(2 * Math.PI * freq * t);
-        const toneB = Math.sign(Math.sin(2 * Math.PI * (freq * 0.5) * t));
-        channel[i] = (toneA * 0.55 + toneB * 0.18) * env * 0.26;
-      }
+      const now = audioCtx.currentTime + 0.01;
+      const masterGain = audioCtx.createGain();
+      masterGain.gain.setValueAtTime(volume, now);
+      masterGain.connect(audioCtx.destination);
 
-      return buffer;
+      let cursor = now;
+      notes.forEach(({ freq, duration, accent = 1 }) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        const noteEnd = cursor + duration;
+        const sustainUntil = noteEnd - Math.min(duration * 0.32, 0.045);
+
+        osc.type = wave;
+        osc.frequency.setValueAtTime(freq, cursor);
+
+        gain.gain.setValueAtTime(0.0001, cursor);
+        gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, accent), cursor + Math.min(duration * 0.18, 0.025));
+        gain.gain.setValueAtTime(Math.max(0.0001, accent * 0.82), sustainUntil);
+        gain.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
+
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start(cursor);
+        osc.stop(noteEnd + 0.01);
+        cursor = noteEnd;
+      });
     }
 
-    function startBgmLoop() {
-      if (!audioCtx || bgmSource) return;
+    function playIntroStinger() {
+      playArcadeStinger([
+        { freq: 523.25, duration: 0.11, accent: 1 },
+        { freq: 659.25, duration: 0.11, accent: 0.95 },
+        { freq: 783.99, duration: 0.16, accent: 1.05 },
+        { freq: 659.25, duration: 0.11, accent: 0.92 },
+        { freq: 698.46, duration: 0.24, accent: 0.9 }
+      ], 0.05, "square");
+    }
 
-      bgmSource = audioCtx.createBufferSource();
-      bgmSource.buffer = createArcadeLoopBuffer();
-      bgmSource.loop = true;
-      bgmSource.connect(bgmGain);
-      bgmSource.start();
-      bgmSource.onended = () => {
-        bgmSource = null;
-      };
+    function playFinalStinger() {
+      playArcadeStinger([
+        { freq: 659.25, duration: 0.12, accent: 0.95 },
+        { freq: 783.99, duration: 0.12, accent: 1 },
+        { freq: 987.77, duration: 0.18, accent: 1.05 },
+        { freq: 1318.51, duration: 0.3, accent: 1.12 }
+      ], 0.055, "triangle");
     }
 
     function playSynthExplosion(type) {
@@ -1843,6 +1852,7 @@
     function handleGameEntry() {
       mobileUiLocked = isMobileDevice();
       unlockAudio();
+      playIntroStinger();
       primeMobileViewport();
       requestGameFullscreen();
       startGame();
@@ -1937,6 +1947,7 @@
       running = false;
       isPaused = false;
       releaseMove();
+      playFinalStinger();
       cancelAnimationFrame(animationId);
       resizeCelebrationCanvas();
       createCelebrationParticles();
@@ -3254,7 +3265,6 @@
       if (audioCtx && audioCtx.state === "suspended" && !isPaused) {
         audioCtx.resume().catch(() => {});
       }
-      startBgmLoop();
     };
 
     window.addEventListener("pointerdown", unlockAudio, { passive: true });
