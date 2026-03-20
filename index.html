@@ -661,7 +661,7 @@
           </div>
           <div class="card">
             <span class="label">Próx. mejora</span>
-            <span class="value" id="nextUpgrade">35</span>
+            <span class="value" id="nextUpgrade">25</span>
           </div>
         </div>
         <button id="pauseBtn" type="button" aria-label="Pausar juego">⏸</button>
@@ -744,7 +744,7 @@
     const moveLeftBtn = document.getElementById("moveLeftBtn");
     const moveRightBtn = document.getElementById("moveRightBtn");
 
-    const UPGRADE_STEPS = [35, 100, 200, 300];
+    const UPGRADE_STEPS = [25, 90, 200, 300];
     const FIRST_BOSS_TIME = 30;
     const SECOND_BOSS_DELAY_AFTER_KILL = 30;
     const THIRD_BOSS_DELAY_AFTER_KILL = 30;
@@ -1147,8 +1147,8 @@
     function maxWeaponLevelAvailableByCoins() {
       if (coins >= 300) return 5;
       if (coins >= 200) return 4;
-      if (coins >= 100) return 3;
-      if (coins >= 35) return 2;
+      if (coins >= 90) return 3;
+      if (coins >= 25) return 2;
       return 1;
     }
 
