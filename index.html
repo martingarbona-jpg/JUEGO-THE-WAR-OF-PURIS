@@ -110,6 +110,57 @@
       padding: 20px;
       background: rgba(0,0,0,0.45);
       border-radius: 16px;
+      z-index: 1100;
+    }
+
+    .orientation-overlay {
+      background: rgba(2, 6, 23, 0.94);
+      z-index: 1300;
+    }
+
+    .orientation-panel {
+      max-width: 360px;
+      padding: 24px 22px;
+    }
+
+    .orientation-icon {
+      width: 70px;
+      height: 70px;
+      margin: 0 auto 14px;
+      border: 3px solid rgba(148, 163, 184, 0.9);
+      border-radius: 18px;
+      position: relative;
+      transform: rotate(90deg);
+    }
+
+    .orientation-icon::before {
+      content: "";
+      position: absolute;
+      inset: 8px;
+      border: 2px solid rgba(148, 163, 184, 0.55);
+      border-radius: 12px;
+    }
+
+    .orientation-icon::after {
+      content: "";
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.8);
+    }
+
+    .orientation-title {
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+
+    .orientation-text {
+      margin-bottom: 0;
+      font-size: 15px;
     }
 
     .overlay.show {
@@ -323,6 +374,17 @@
             </div>
           </div>
         </div>
+
+        <div class="overlay orientation-overlay" id="orientationOverlay" aria-hidden="true">
+          <div class="panel orientation-panel">
+            <div class="orientation-icon" aria-hidden="true"></div>
+            <h1 class="orientation-title">Poné el celular en horizontal</h1>
+            <p class="orientation-text">
+              Este juego está optimizado para modo apaisado.<br>
+              Girá el celular para jugar mejor.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -355,6 +417,7 @@
     const overlayText = document.getElementById("overlayText");
     const startBtn = document.getElementById("startBtn");
     const restartBtn = document.getElementById("restartBtn");
+    const orientationOverlay = document.getElementById("orientationOverlay");
 
     const leftBtn = document.getElementById("leftBtn");
     const rightBtn = document.getElementById("rightBtn");
@@ -366,8 +429,10 @@
     const THIRD_BOSS_DELAY_AFTER_KILL = 30;
     const FOURTH_BOSS_DELAY_AFTER_KILL = 60;
     const DESKTOP_WORLD = { width: 900, height: 540 };
-    const MOBILE_WORLD = { width: 540, height: 900 };
+    const MOBILE_WORLD = { width: 900, height: 540 };
     const MOBILE_BREAKPOINT = window.matchMedia("(max-width: 768px)");
+    const COARSE_POINTER = window.matchMedia("(pointer: coarse)");
+    const PORTRAIT_ORIENTATION = window.matchMedia("(orientation: portrait)");
 
     let animationId = null;
     let running = false;
@@ -421,10 +486,44 @@
     let lastEnemyExplosionAt = 0;
     let lastStageWidth = 0;
     let lastStageHeight = 0;
+    let autoPausedByOrientation = false;
 
 
     function clamp(value, min, max) {
       return Math.min(Math.max(value, min), max);
+    }
+
+    function isMobileDevice() {
+      return MOBILE_BREAKPOINT.matches && COARSE_POINTER.matches;
+    }
+
+    function shouldBlockPortraitMobile() {
+      return isMobileDevice() && PORTRAIT_ORIENTATION.matches;
+    }
+
+    function syncOrientationOverlay() {
+      const shouldBlock = shouldBlockPortraitMobile();
+      orientationOverlay.classList.toggle("show", shouldBlock);
+      orientationOverlay.setAttribute("aria-hidden", shouldBlock ? "false" : "true");
+
+      if (shouldBlock) {
+        releaseMove();
+        if (running && !isPaused) {
+          isPaused = true;
+          autoPausedByOrientation = true;
+          if (audioCtx && audioCtx.state !== "closed") {
+            audioCtx.suspend().catch(() => {});
+          }
+          updatePauseButton();
+        }
+      } else if (autoPausedByOrientation) {
+        isPaused = false;
+        autoPausedByOrientation = false;
+        if (audioCtx && audioCtx.state !== "closed") {
+          audioCtx.resume().catch(() => {});
+        }
+        updatePauseButton();
+      }
     }
 
     function getTargetWorldSize() {
@@ -432,6 +531,7 @@
     }
 
     function resizeCanvas() {
+      syncOrientationOverlay();
       const rect = canvasBox.getBoundingClientRect();
       const { width: nextWidth, height: nextHeight } = getTargetWorldSize();
       const prevWidth = canvas.width;
@@ -778,6 +878,7 @@
       resetGame();
       running = true;
       overlay.classList.remove("show");
+      syncOrientationOverlay();
       loop();
     }
 
@@ -1896,6 +1997,15 @@
     rightBtn.addEventListener("mouseleave", releaseMove);
 
     pauseBtn.onclick = togglePause;
+
+    [MOBILE_BREAKPOINT, COARSE_POINTER, PORTRAIT_ORIENTATION].forEach((mediaQuery) => {
+      const handleChange = () => resizeCanvas();
+      if (typeof mediaQuery.addEventListener === "function") {
+        mediaQuery.addEventListener("change", handleChange);
+      } else if (typeof mediaQuery.addListener === "function") {
+        mediaQuery.addListener(handleChange);
+      }
+    });
 
     const unlockAudio = () => {
       ensureAudioReady();
