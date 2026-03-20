@@ -839,6 +839,7 @@
     let celebrationAnimationId = null;
     let celebrationTimeoutId = null;
     let celebrationParticles = [];
+    let waitingForFinalCelebrationAdvance = false;
     let finalVictoryAchieved = false;
     let normalEnemyKills = 0;
     let totalEnemyKills = 0;
@@ -1984,6 +1985,7 @@
     }
 
     function hideFinalBossCelebration() {
+      waitingForFinalCelebrationAdvance = false;
       celebrationOverlay.classList.remove("show");
       celebrationOverlay.setAttribute("aria-hidden", "true");
       if (celebrationAnimationId) {
@@ -1998,6 +2000,13 @@
       celebrationCtx.clearRect(0, 0, celebrationCanvas.width, celebrationCanvas.height);
     }
 
+    function advanceFinalBossCelebration() {
+      if (!waitingForFinalCelebrationAdvance) return false;
+      waitingForFinalCelebrationAdvance = false;
+      showFinalResultOverlay();
+      return true;
+    }
+
     function triggerFinalBossCelebration() {
       running = false;
       isPaused = false;
@@ -2008,11 +2017,8 @@
       createCelebrationParticles();
       celebrationOverlay.classList.add("show");
       celebrationOverlay.setAttribute("aria-hidden", "false");
+      waitingForFinalCelebrationAdvance = true;
       animateFinalBossCelebration();
-      celebrationTimeoutId = setTimeout(() => {
-        celebrationTimeoutId = null;
-        showFinalResultOverlay();
-      }, 3200);
     }
 
     function triggerBossIntro(bossIndex) {
@@ -3297,6 +3303,11 @@
     }
 
     document.addEventListener("keydown", (e) => {
+      if (advanceFinalBossCelebration()) {
+        e.preventDefault();
+        return;
+      }
+
       if (e.code === "Space") {
         e.preventDefault();
         togglePause();
@@ -3338,6 +3349,9 @@
 
     window.addEventListener("pointerdown", unlockAudio, { passive: true });
     window.addEventListener("keydown", unlockAudio, { passive: true });
+    celebrationOverlay.addEventListener("pointerdown", advanceFinalBossCelebration);
+    celebrationOverlay.addEventListener("touchstart", advanceFinalBossCelebration, { passive: true });
+    celebrationOverlay.addEventListener("click", advanceFinalBossCelebration);
     startBtn.addEventListener("click", handleGameEntry);
     restartBtn.addEventListener("click", handleGameEntry);
 
