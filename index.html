@@ -661,7 +661,7 @@
           </div>
           <div class="card">
             <span class="label">Próx. mejora</span>
-            <span class="value" id="nextUpgrade">25</span>
+            <span class="value" id="nextUpgrade">35</span>
           </div>
         </div>
         <button id="pauseBtn" type="button" aria-label="Pausar juego">⏸</button>
@@ -744,7 +744,7 @@
     const moveLeftBtn = document.getElementById("moveLeftBtn");
     const moveRightBtn = document.getElementById("moveRightBtn");
 
-    const UPGRADE_STEPS = [25, 75, 150, 300, 600];
+    const UPGRADE_STEPS = [35, 100, 200, 400];
     const FIRST_BOSS_TIME = 30;
     const SECOND_BOSS_DELAY_AFTER_KILL = 30;
     const THIRD_BOSS_DELAY_AFTER_KILL = 30;
@@ -819,6 +819,10 @@
     let celebrationParticles = [];
     let finalVictoryAchieved = false;
     let normalEnemyKills = 0;
+    let totalEnemyKills = 0;
+    let advancedEnemiesUnlocked = false;
+    let diamondUpgradeSpawned = false;
+    let diamondMode = false;
     let shieldActive = false;
     let shieldTimer = 0;
     let screenShake = 0;
@@ -1140,14 +1144,15 @@
     }
 
     function maxWeaponLevelAvailableByCoins() {
-      if (coins >= 300) return 5;
-      if (coins >= 150) return 4;
-      if (coins >= 75) return 3;
-      if (coins >= 25) return 2;
+      if (coins >= 400) return 5;
+      if (coins >= 200) return 4;
+      if (coins >= 100) return 3;
+      if (coins >= 35) return 2;
       return 1;
     }
 
     function weaponDamage(level) {
+      if (level === 6) return 10;
       return level;
     }
 
@@ -1168,7 +1173,7 @@
       bestEl.textContent = bestCoins;
       livesEl.textContent = lives;
       mobileLivesValueEl.textContent = lives;
-      weaponEl.textContent = weaponLevel;
+      weaponEl.textContent = diamondMode ? "◆" : weaponLevel;
       nextUpgradeEl.textContent = nextUpgradeTarget();
       timeEl.textContent = `${elapsedSeconds}s`;
 
@@ -1197,6 +1202,28 @@
       return { fill: "#6d28d9", detail: "#2e1065" };
     }
 
+    function enemyStyleByType(enemyType, tier) {
+      const base = enemyColorByTier(tier);
+
+      if (enemyType === "tracker") {
+        return { fill: "#818cf8", detail: "#312e81", glow: "rgba(129, 140, 248, 0.38)" };
+      }
+
+      if (enemyType === "shooter") {
+        return { fill: "#f97316", detail: "#9a3412", glow: "rgba(249, 115, 22, 0.38)" };
+      }
+
+      if (enemyType === "kamikaze") {
+        return { fill: "#ef4444", detail: "#7f1d1d", glow: "rgba(239, 68, 68, 0.42)" };
+      }
+
+      if (enemyType === "zigzag") {
+        return { ...base, glow: "rgba(125, 211, 252, 0.18)" };
+      }
+
+      return { ...base, glow: "rgba(255, 255, 255, 0.12)" };
+    }
+
     function coinStyleByValue(value) {
       if (value === 1) return { fill: "#b87333", ring: "#7a4316", label: "1" };
       if (value === 2) return { fill: "#c0c0c0", ring: "#6b7280", label: "2" };
@@ -1220,24 +1247,30 @@
     }
 
     function createSpecialEnemyType() {
+      const roll = Math.random();
       const specialEnemies = enemies.filter(enemy => enemy.enemyType !== "normal" && enemy.enemyType !== "zigzag");
+      const trackerCount = enemies.filter(enemy => enemy.enemyType === "tracker").length;
       const shooterCount = enemies.filter(enemy => enemy.enemyType === "shooter").length;
       const kamikazeCount = enemies.filter(enemy => enemy.enemyType === "kamikaze").length;
-      const roll = Math.random();
+      const zigzagChance = enemyHorizontalFactor > 0 ? 0.38 : 0.2;
 
-      if (elapsedSeconds >= 50 && kamikazeCount < 1 && specialEnemies.length < 3 && roll < 0.08) {
-        return "kamikaze";
+      if (!advancedEnemiesUnlocked) {
+        return Math.random() < zigzagChance ? "zigzag" : "normal";
       }
 
-      if (elapsedSeconds >= 32 && shooterCount < 2 && specialEnemies.length < 3 && roll < 0.18) {
-        return "shooter";
-      }
-
-      if (elapsedSeconds >= 18 && specialEnemies.length < 4 && roll < 0.34) {
+      if (roll < 0.10 && trackerCount < 2 && specialEnemies.length < 4) {
         return "tracker";
       }
 
-      return enemyHorizontalFactor > 0 && Math.random() < 0.34 ? "zigzag" : "normal";
+      if (roll < 0.20 && shooterCount < 2 && specialEnemies.length < 4) {
+        return "shooter";
+      }
+
+      if (roll < 0.30 && kamikazeCount < 2 && specialEnemies.length < 4) {
+        return "kamikaze";
+      }
+
+      return Math.random() < zigzagChance ? "zigzag" : "normal";
     }
 
     function spawnShieldDrop(x, y) {
@@ -1264,6 +1297,19 @@
       });
     }
 
+    function spawnDiamondUpgrade(x, y) {
+      weaponDrops.push({
+        x: clamp(x, 0, canvas.width - 32),
+        y: Math.max(32, y),
+        w: 32,
+        h: 32,
+        dx: (Math.random() < 0.5 ? -1 : 1) * 1.5,
+        dy: 1.05,
+        sway: Math.random() * Math.PI * 2,
+        kind: "diamond"
+      });
+    }
+
     function maybeSpawnRewardDrop(x, y) {
       if (normalEnemyKills > 0 && normalEnemyKills % 25 === 0) {
         spawnLifeDrop(x, y);
@@ -1280,7 +1326,13 @@
       spawnCoin(x - 11, y - 11, enemy.maxHp);
       playEnemyExplosionSound();
       normalEnemyKills++;
+      totalEnemyKills++;
       maybeSpawnRewardDrop(x - 14, y - 14);
+
+      if (totalEnemyKills >= 100 && !diamondUpgradeSpawned) {
+        diamondUpgradeSpawned = true;
+        spawnDiamondUpgrade(x - 16, y - 16);
+      }
     }
 
     function activateShield() {
@@ -1338,6 +1390,10 @@
       weaponLevel = 1;
       finalVictoryAchieved = false;
       normalEnemyKills = 0;
+      totalEnemyKills = 0;
+      advancedEnemiesUnlocked = false;
+      diamondUpgradeSpawned = false;
+      diamondMode = false;
       shieldActive = false;
       shieldTimer = 0;
       screenShake = 0;
@@ -1420,7 +1476,7 @@
       updatePauseButton();
       overlayTitle.textContent = "PURIS VS LAS MAQUINAS";
       overlayTitle.dataset.title = "PURIS VS LAS MAQUINAS";
-      overlayText.textContent = `Monedas: ${coins} | Tiempo: ${elapsedSeconds}s | Arma final: ${weaponLevel}`;
+      overlayText.textContent = `Monedas: ${coins} | Tiempo: ${elapsedSeconds}s | Arma final: ${diamondMode ? "Diamante" : weaponLevel}`;
       overlayExtra.hidden = !finalVictoryAchieved;
       overlayExtra.innerHTML = finalVictoryAchieved
         ? 'Desarrollado por <strong>"Tu padre"</strong> para <strong>"Su preferido"</strong> ❤️ Te amo'
@@ -1503,11 +1559,13 @@
       const w = 42;
       const h = 32;
       const x = Math.random() * (canvas.width - w);
-      const colors = enemyColorByTier(tier);
       const enemyType = createSpecialEnemyType();
+      const colors = enemyStyleByType(enemyType, tier);
       const horizontalSpeed = enemyType === "zigzag"
-        ? (Math.random() < 0.5 ? -1 : 1) * (0.35 + Math.random() * Math.max(0.2, enemyHorizontalFactor))
-        : 0;
+        ? (Math.random() < 0.5 ? -1 : 1) * (0.55 + Math.random() * Math.max(0.28, enemyHorizontalFactor + 0.2))
+        : enemyType === "normal" && enemyHorizontalFactor > 0.32
+          ? (Math.random() < 0.35 ? (Math.random() < 0.5 ? -1 : 1) * (0.12 + enemyHorizontalFactor * 0.16) : 0)
+          : 0;
 
       enemies.push({
         x,
@@ -1516,17 +1574,18 @@
         h,
         hp: tier,
         maxHp: tier,
-        speed: enemyBaseSpeed + Math.random() * 0.7 + tier * 0.09 + (enemyType === "kamikaze" ? 0.2 : 0),
+        speed: enemyBaseSpeed + Math.random() * 0.7 + tier * 0.09 + (enemyType === "kamikaze" ? 0.38 : enemyType === "tracker" ? 0.12 : 0),
         colors,
         theme: currentBossTheme,
         dx: horizontalSpeed,
         enemyType,
-        fireCooldown: enemyType === "shooter" ? 85 + Math.floor(Math.random() * 50) : 0,
-        trackingStrength: enemyType === "tracker" ? 0.025 + Math.random() * 0.012 : 0,
-        trackingMax: enemyType === "tracker" ? 0.75 + Math.random() * 0.35 : 0,
-        kamikazeRange: enemyType === "kamikaze" ? 108 : 0,
+        fireCooldown: enemyType === "shooter" ? 78 + Math.floor(Math.random() * 36) : 0,
+        trackingStrength: enemyType === "tracker" ? 0.03 + Math.random() * 0.015 : 0,
+        trackingMax: enemyType === "tracker" ? 0.95 + Math.random() * 0.45 : 0,
+        kamikazeRange: enemyType === "kamikaze" ? 116 : 0,
         explosionRadius: enemyType === "kamikaze" ? 52 : 0,
-        warningTimer: 0
+        warningTimer: 0,
+        driftPhase: Math.random() * Math.PI * 2
       });
     }
 
@@ -1550,7 +1609,9 @@
         w: 28,
         h: 28,
         dx: dir * (2.4 + Math.random() * 1.3),
-        dy: 1.1 + Math.random() * 0.7
+        dy: 1.1 + Math.random() * 0.7,
+        kind: "weapon",
+        sway: Math.random() * Math.PI * 2
       });
     }
 
@@ -1606,10 +1667,10 @@
         2000;
 
       const moveSpeed =
-        bossIndex === 1 ? 1.05 :
-        bossIndex === 2 ? 1.28 :
-        bossIndex === 3 ? 1.48 :
-        1.75;
+        bossIndex === 1 ? 1.15 :
+        bossIndex === 2 ? 1.52 :
+        bossIndex === 3 ? 1.82 :
+        2.15;
 
       boss = {
         type: bossIndex,
@@ -1860,6 +1921,11 @@
       if (weaponLevel === 5) {
         bullets.push({ x: centerX - 6, y: 0, w: 12, h: player.y + 10, speed: 0, damage: dmg, type: "laser-gold", color: "#facc15", life: 2 });
       }
+
+      if (weaponLevel === 6) {
+        bullets.push({ x: centerX - 18, y: 0, w: 12, h: player.y + 12, speed: 0, damage: dmg, type: "laser-diamond", color: "#facc15", life: 2 });
+        bullets.push({ x: centerX + 6, y: 0, w: 12, h: player.y + 12, speed: 0, damage: dmg, type: "laser-diamond", color: "#e0f2fe", life: 2 });
+      }
     }
 
     function updateBossIntro() {
@@ -1887,7 +1953,7 @@
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
 
-        if (b.type === "laser-red" || b.type === "laser-gold") {
+        if (b.type === "laser-red" || b.type === "laser-gold" || b.type === "laser-diamond") {
           b.life--;
           if (b.life <= 0) bullets.splice(i, 1);
           continue;
@@ -1911,28 +1977,29 @@
 
         if (e.enemyType === "tracker") {
           const follow = clamp((playerCenter - enemyCenter) * e.trackingStrength, -e.trackingMax, e.trackingMax);
-          e.x += follow;
+          e.x += follow + Math.sin((frame + i * 9) * 0.045 + e.driftPhase) * 0.24;
         } else if (e.enemyType === "shooter") {
-          e.x += Math.sin((frame + i * 11) * 0.03) * 0.35;
+          e.x += Math.sin((frame + i * 11) * 0.045 + e.driftPhase) * 0.65;
+          e.warningTimer = e.fireCooldown < 22 ? e.fireCooldown : 0;
           e.fireCooldown--;
-          if (e.fireCooldown <= 0 && enemyBullets.length < 10) {
+          if (e.fireCooldown <= 0 && enemyBullets.length < 12) {
             enemyBullets.push({
               x: e.x + e.w / 2,
               y: e.y + e.h,
               r: 5,
-              dx: 0,
-              dy: 2.6 + Math.min(1.2, elapsedSeconds * 0.01),
+              dx: (playerCenter - enemyCenter) * 0.006,
+              dy: 2.9 + Math.min(1.45, elapsedSeconds * 0.012),
               color: "#fdba74"
             });
-            e.fireCooldown = 120 + Math.floor(Math.random() * 50);
+            e.fireCooldown = 92 + Math.floor(Math.random() * 34);
           }
         } else if (e.enemyType === "kamikaze") {
-          const homingStrength = verticalDistance < 190 ? 0.06 : 0.03;
-          const maxShift = verticalDistance < 190 ? 1.35 : 0.8;
+          const homingStrength = verticalDistance < 200 ? 0.09 : 0.042;
+          const maxShift = verticalDistance < 200 ? 1.7 : 1.05;
           const follow = clamp((playerCenter - enemyCenter) * homingStrength, -maxShift, maxShift);
           e.x += follow;
-          if (verticalDistance < 220) {
-            e.y += 0.45;
+          if (verticalDistance < 240) {
+            e.y += 0.62;
             e.warningTimer = Math.min(24, e.warningTimer + 1);
           } else {
             e.warningTimer = Math.max(0, e.warningTimer - 1);
@@ -1944,6 +2011,9 @@
           }
         } else {
           e.x += e.dx;
+          if (e.enemyType === "normal" && e.dx === 0 && enemyHorizontalFactor > 0.4) {
+            e.x += Math.sin((frame + i * 7) * 0.03 + e.driftPhase) * 0.22;
+          }
         }
 
         if (e.dx !== 0) {
@@ -1984,7 +2054,8 @@
     function updateWeaponDrops() {
       for (let i = weaponDrops.length - 1; i >= 0; i--) {
         const w = weaponDrops[i];
-        w.x += w.dx;
+        w.sway = (w.sway || 0) + (w.kind === "diamond" ? 0.12 : 0.08);
+        w.x += w.dx + Math.sin(w.sway) * (w.kind === "diamond" ? 0.45 : 0);
         w.y += w.dy;
 
         if (w.x <= 0) {
@@ -2080,10 +2151,10 @@
       if (boss.fireCooldown <= 0) {
         fireBossPattern();
         boss.fireCooldown =
-          boss.type === 1 ? 130 :
-          boss.type === 2 ? 105 :
-          boss.type === 3 ? 88 :
-          72;
+          boss.type === 1 ? 124 :
+          boss.type === 2 ? 88 :
+          boss.type === 3 ? 68 :
+          54;
       }
     }
 
@@ -2098,20 +2169,20 @@
       let radius = 6;
 
       if (boss.type === 1) {
-        pattern = [-0.32, 0, 0.32];
-        speed = 1.25;
+        pattern = [-0.34, 0, 0.34];
+        speed = 1.3;
         radius = 6;
       } else if (boss.type === 2) {
-        pattern = [-0.50, -0.16, 0.16, 0.50];
-        speed = 1.4;
+        pattern = [-0.58, -0.2, 0.2, 0.58];
+        speed = 1.62;
         radius = 6;
       } else if (boss.type === 3) {
-        pattern = [-0.62, -0.24, 0, 0.24, 0.62];
-        speed = 1.58;
+        pattern = [-0.72, -0.3, 0, 0.3, 0.72];
+        speed = 1.86;
         radius = 7;
       } else {
-        pattern = [-0.78, -0.42, -0.14, 0.14, 0.42, 0.78];
-        speed = 1.78;
+        pattern = [-0.9, -0.56, -0.22, 0.22, 0.56, 0.9];
+        speed = 2.08;
         radius = 7;
       }
 
@@ -2148,7 +2219,7 @@
           if (rectsCollide(b, e)) {
             e.hp -= b.damage;
 
-            if (b.type !== "laser-red" && b.type !== "laser-gold") {
+            if (b.type !== "laser-red" && b.type !== "laser-gold" && b.type !== "laser-diamond") {
               bullets.splice(i, 1);
               removeBullet = true;
             }
@@ -2175,7 +2246,7 @@
         if (rectsCollide(b, boss)) {
           boss.hp -= b.damage;
 
-          if (b.type !== "laser-red" && b.type !== "laser-gold") {
+          if (b.type !== "laser-red" && b.type !== "laser-gold" && b.type !== "laser-diamond") {
             bullets.splice(i, 1);
           }
 
@@ -2198,6 +2269,7 @@
             if (defeatedBossType === 1) {
               pendingBoss2At = elapsedSeconds + SECOND_BOSS_DELAY_AFTER_KILL;
             } else if (defeatedBossType === 2) {
+              advancedEnemiesUnlocked = true;
               pendingBoss3At = elapsedSeconds + THIRD_BOSS_DELAY_AFTER_KILL;
             } else if (defeatedBossType === 3) {
               pendingBoss4At = elapsedSeconds + FOURTH_BOSS_DELAY_AFTER_KILL;
@@ -2264,7 +2336,17 @@
 
       for (let i = weaponDrops.length - 1; i >= 0; i--) {
         if (rectsCollide(player, weaponDrops[i])) {
+          const drop = weaponDrops[i];
           weaponDrops.splice(i, 1);
+
+          if (drop.kind === "diamond") {
+            diamondMode = true;
+            weaponLevel = 6;
+            continue;
+          }
+
+          if (diamondMode) continue;
+
           const maxAvailable = maxWeaponLevelAvailableByCoins();
           if (weaponLevel < maxAvailable) weaponLevel++;
         }
@@ -2286,22 +2368,23 @@
     }
 
     function updateDifficulty() {
-      const stage = Math.floor(elapsedSeconds / 20);
+      const stage = Math.floor(elapsedSeconds / 18);
+      const bossPressure = bossesSpawned.has(3) ? 4 : advancedEnemiesUnlocked ? 2 : 0;
 
-      enemyBaseSpeed = 1.65 + stage * 0.07;
-      enemySpawnRate = Math.max(20, 54 - stage * 2);
+      enemyBaseSpeed = 1.65 + stage * 0.08 + (advancedEnemiesUnlocked ? 0.08 : 0);
+      enemySpawnRate = Math.max(16, 54 - stage * 2 - bossPressure);
       autoFireRate = Math.max(8, 13 - Math.floor(stage / 4));
 
       if (elapsedSeconds < 20) {
-        enemyHorizontalFactor = 0;
+        enemyHorizontalFactor = 0.08;
       } else if (elapsedSeconds < 45) {
-        enemyHorizontalFactor = 0.35;
+        enemyHorizontalFactor = 0.48;
       } else if (elapsedSeconds < 80) {
-        enemyHorizontalFactor = 0.65;
+        enemyHorizontalFactor = 0.86;
       } else if (elapsedSeconds < 130) {
-        enemyHorizontalFactor = 0.95;
+        enemyHorizontalFactor = 1.16;
       } else {
-        enemyHorizontalFactor = 1.25;
+        enemyHorizontalFactor = 1.42;
       }
     }
 
@@ -2503,6 +2586,60 @@
         ctx.fillRect(x + player.w / 2 - 2, y - 18, 4, 10);
       }
 
+      if (weaponLevel === 6) {
+        const bodyGradient = ctx.createLinearGradient(x, y, x + player.w, y + player.h);
+        bodyGradient.addColorStop(0, "#fff7ed");
+        bodyGradient.addColorStop(0.4, "#facc15");
+        bodyGradient.addColorStop(0.75, "#f59e0b");
+        bodyGradient.addColorStop(1, "#e0f2fe");
+        ctx.fillStyle = bodyGradient;
+        ctx.beginPath();
+        ctx.moveTo(x + player.w / 2, y - 10);
+        ctx.lineTo(x + player.w + 6, y + 10);
+        ctx.lineTo(x + player.w + 2, y + player.h - 6);
+        ctx.lineTo(x + player.w / 2, y + player.h + 4);
+        ctx.lineTo(x - 2, y + player.h - 6);
+        ctx.lineTo(x - 6, y + 10);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "#fef3c7";
+        ctx.beginPath();
+        ctx.moveTo(x + player.w / 2, y - 2);
+        ctx.lineTo(x + player.w - 10, y + 18);
+        ctx.lineTo(x + player.w / 2, y + player.h - 8);
+        ctx.lineTo(x + 10, y + 18);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "#bae6fd";
+        ctx.fillRect(x - 12, y + 16, 18, 24);
+        ctx.fillRect(x + player.w - 6, y + 16, 18, 24);
+
+        ctx.fillStyle = "#a16207";
+        ctx.fillRect(x + 12, y + 16, 32, 18);
+
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.moveTo(x + player.w / 2, y + 6);
+        ctx.lineTo(x + player.w / 2 + 8, y + 20);
+        ctx.lineTo(x + player.w / 2, y + 34);
+        ctx.lineTo(x + player.w / 2 - 8, y + 20);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "#facc15";
+        ctx.fillRect(x + 8, y - 16, 8, 28);
+        ctx.fillRect(x + player.w - 16, y - 16, 8, 28);
+
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 3, y + 3, player.w - 6, player.h - 6);
+
+        ctx.shadowColor = "rgba(250, 204, 21, 0.7)";
+        ctx.shadowBlur = 18;
+      }
+
       ctx.fillStyle = "#f59e0b";
       ctx.beginPath();
       ctx.moveTo(x + 16, y + player.h);
@@ -2538,10 +2675,14 @@
 
     function drawBullets() {
       for (const b of bullets) {
-        if (b.type === "laser-red" || b.type === "laser-gold") {
-          ctx.globalAlpha = 0.65;
+        if (b.type === "laser-red" || b.type === "laser-gold" || b.type === "laser-diamond") {
+          ctx.globalAlpha = b.type === "laser-diamond" ? 0.82 : 0.65;
           ctx.fillStyle = b.color;
           ctx.fillRect(b.x, b.y, b.w, b.h);
+          if (b.type === "laser-diamond") {
+            ctx.fillStyle = "rgba(255,255,255,0.55)";
+            ctx.fillRect(b.x + 3, b.y, Math.max(2, b.w - 6), b.h);
+          }
           ctx.globalAlpha = 1;
         } else {
           ctx.fillStyle = b.color;
@@ -2551,17 +2692,49 @@
     }
 
     function drawMiniEnemy(enemy) {
-      const { x, y, w, h, colors, theme } = enemy;
+      const { x, y, w, h, colors, theme, enemyType } = enemy;
       ctx.save();
+      ctx.shadowColor = colors.glow || "transparent";
+      ctx.shadowBlur = enemyType === "kamikaze" ? 16 : 10;
       ctx.fillStyle = colors.fill;
 
-      if (theme === 1) {
+      if (enemyType === "tracker") {
+        ctx.beginPath();
+        ctx.moveTo(x + w / 2, y + 1);
+        ctx.lineTo(x + w - 4, y + h * 0.35);
+        ctx.lineTo(x + w * 0.72, y + h - 3);
+        ctx.lineTo(x + w / 2, y + h * 0.78);
+        ctx.lineTo(x + w * 0.28, y + h - 3);
+        ctx.lineTo(x + 4, y + h * 0.35);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = colors.detail;
+        ctx.fillRect(x + 11, y + h * 0.36, w - 22, 7);
+      } else if (enemyType === "shooter") {
+        ctx.fillRect(x + 4, y + 6, w - 8, h - 12);
+        ctx.fillStyle = colors.detail;
+        ctx.fillRect(x + 11, y + 2, w - 22, 10);
+        ctx.fillRect(x + 8, y + h - 12, w - 16, 6);
+      } else if (enemyType === "kamikaze") {
+        ctx.beginPath();
+        ctx.moveTo(x + w / 2, y + 2);
+        ctx.lineTo(x + w - 4, y + h * 0.3);
+        ctx.lineTo(x + w - 8, y + h - 4);
+        ctx.lineTo(x + 8, y + h - 4);
+        ctx.lineTo(x + 4, y + h * 0.3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = colors.detail;
+        ctx.beginPath();
+        ctx.arc(x + w / 2, y + h * 0.48, 7, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (theme === 1) {
         ctx.fillRect(x + 6, y + 8, w - 12, h - 10);
         ctx.fillStyle = colors.detail;
         ctx.fillRect(x + 12, y + 2, w - 24, 10);
         ctx.fillRect(x + 4, y + h - 10, 8, 8);
         ctx.fillRect(x + w - 12, y + h - 10, 8, 8);
-      } else if (theme === 2) {
+      } else if (theme === 2 || enemyType === "zigzag") {
         ctx.beginPath();
         ctx.moveTo(x + w / 2, y);
         ctx.lineTo(x + w, y + h * 0.45);
@@ -2586,7 +2759,8 @@
         ctx.fill();
       }
 
-      ctx.strokeStyle = "rgba(255,255,255,0.18)";
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = enemyType === "kamikaze" ? "rgba(255, 226, 226, 0.45)" : "rgba(255,255,255,0.18)";
       ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
       ctx.restore();
     }
@@ -2596,22 +2770,27 @@
         drawMiniEnemy(e);
 
         if (e.enemyType === "tracker") {
-          ctx.strokeStyle = "rgba(191, 219, 254, 0.5)";
+          ctx.strokeStyle = "rgba(224, 231, 255, 0.8)";
           ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.moveTo(e.x + 6, e.y + e.h - 5);
-          ctx.lineTo(e.x + e.w - 6, e.y + e.h - 5);
+          ctx.moveTo(e.x + 7, e.y + e.h - 6);
+          ctx.lineTo(e.x + e.w - 7, e.y + e.h - 6);
           ctx.stroke();
         }
 
         if (e.enemyType === "shooter") {
-          ctx.fillStyle = "#fed7aa";
-          ctx.fillRect(e.x + e.w / 2 - 4, e.y + e.h - 6, 8, 10);
+          ctx.fillStyle = e.warningTimer > 0 ? "#fff7ed" : "#fed7aa";
+          ctx.fillRect(e.x + e.w / 2 - 5, e.y + e.h - 7, 10, 12);
+          if (e.warningTimer > 0) {
+            ctx.strokeStyle = "rgba(255, 237, 213, 0.9)";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(e.x + 2, e.y + 2, e.w - 4, e.h - 4);
+          }
         }
 
         if (e.enemyType === "kamikaze") {
           const pulse = 1 + Math.sin((frame + e.y) * 0.15) * 0.16;
-          ctx.strokeStyle = e.warningTimer > 8 ? "rgba(251, 113, 133, 0.7)" : "rgba(251, 113, 133, 0.38)";
+          ctx.strokeStyle = e.warningTimer > 8 ? "rgba(254, 202, 202, 0.88)" : "rgba(251, 113, 133, 0.4)";
           ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.arc(e.x + e.w / 2, e.y + e.h / 2, (e.explosionRadius - 12) * pulse, 0, Math.PI * 2);
@@ -2642,6 +2821,36 @@
 
     function drawWeaponDrops() {
       for (const w of weaponDrops) {
+        if (w.kind === "diamond") {
+          const glow = 0.45 + Math.sin((frame + w.y) * 0.16) * 0.18;
+          ctx.save();
+          ctx.shadowColor = `rgba(250, 204, 21, ${Math.max(0.25, glow)})`;
+          ctx.shadowBlur = 18;
+          ctx.fillStyle = "#facc15";
+          ctx.beginPath();
+          ctx.moveTo(w.x + w.w / 2, w.y);
+          ctx.lineTo(w.x + w.w, w.y + w.h / 2);
+          ctx.lineTo(w.x + w.w / 2, w.y + w.h);
+          ctx.lineTo(w.x, w.y + w.h / 2);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.moveTo(w.x + w.w / 2, w.y + 5);
+          ctx.lineTo(w.x + w.w - 6, w.y + w.h / 2);
+          ctx.lineTo(w.x + w.w / 2, w.y + w.h - 5);
+          ctx.lineTo(w.x + 6, w.y + w.h / 2);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.strokeStyle = "#fff7ed";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.restore();
+          continue;
+        }
+
         ctx.fillStyle = "#a855f7";
         ctx.fillRect(w.x, w.y, w.w, w.h);
 
