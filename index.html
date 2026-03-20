@@ -794,8 +794,11 @@
     let enemies = [];
     let coinDrops = [];
     let weaponDrops = [];
+    let shieldDrops = [];
+    let lifeDrops = [];
     let particles = [];
     let stars = [];
+    let enemyBullets = [];
     let bossBullets = [];
     let boss = null;
     let currentBossTheme = 1;
@@ -815,6 +818,14 @@
     let celebrationTimeoutId = null;
     let celebrationParticles = [];
     let finalVictoryAchieved = false;
+    let normalEnemyKills = 0;
+    let shieldActive = false;
+    let shieldTimer = 0;
+    let screenShake = 0;
+    let screenShakeStrength = 0;
+    let flashTimer = 0;
+    let flashDuration = 0;
+    let flashColor = "#ffffff";
 
 
     function clamp(value, min, max) {
@@ -1194,6 +1205,124 @@
       return { fill: "#111827", ring: "#7c3aed", label: "5" };
     }
 
+    function triggerScreenEffect(shake, duration, color) {
+      screenShake = Math.max(screenShake, duration);
+      screenShakeStrength = Math.max(screenShakeStrength, shake);
+      flashTimer = Math.max(flashTimer, duration);
+      flashDuration = Math.max(duration, flashDuration);
+      flashColor = color;
+    }
+
+    function distanceBetween(ax, ay, bx, by) {
+      const dx = ax - bx;
+      const dy = ay - by;
+      return Math.hypot(dx, dy);
+    }
+
+    function createSpecialEnemyType() {
+      const specialEnemies = enemies.filter(enemy => enemy.enemyType !== "normal" && enemy.enemyType !== "zigzag");
+      const shooterCount = enemies.filter(enemy => enemy.enemyType === "shooter").length;
+      const kamikazeCount = enemies.filter(enemy => enemy.enemyType === "kamikaze").length;
+      const roll = Math.random();
+
+      if (elapsedSeconds >= 50 && kamikazeCount < 1 && specialEnemies.length < 3 && roll < 0.08) {
+        return "kamikaze";
+      }
+
+      if (elapsedSeconds >= 32 && shooterCount < 2 && specialEnemies.length < 3 && roll < 0.18) {
+        return "shooter";
+      }
+
+      if (elapsedSeconds >= 18 && specialEnemies.length < 4 && roll < 0.34) {
+        return "tracker";
+      }
+
+      return enemyHorizontalFactor > 0 && Math.random() < 0.34 ? "zigzag" : "normal";
+    }
+
+    function spawnShieldDrop(x, y) {
+      shieldDrops.push({
+        x,
+        y,
+        w: 28,
+        h: 28,
+        dx: (Math.random() < 0.5 ? -1 : 1) * 1.2,
+        dy: 1.45,
+        sway: Math.random() * Math.PI * 2
+      });
+    }
+
+    function spawnLifeDrop(x, y) {
+      lifeDrops.push({
+        x,
+        y,
+        w: 28,
+        h: 28,
+        dx: (Math.random() < 0.5 ? -1 : 1) * 1.05,
+        dy: 1.3,
+        sway: Math.random() * Math.PI * 2
+      });
+    }
+
+    function maybeSpawnRewardDrop(x, y) {
+      if (normalEnemyKills > 0 && normalEnemyKills % 25 === 0) {
+        spawnLifeDrop(x, y);
+        return;
+      }
+
+      if (normalEnemyKills > 0 && normalEnemyKills % 10 === 0) {
+        spawnShieldDrop(x, y);
+      }
+    }
+
+    function handleEnemyDefeat(enemy, x, y) {
+      createExplosion(enemy.x + enemy.w / 2, enemy.y + enemy.h / 2, enemy.enemyType === "kamikaze" ? 18 : 14, enemy.colors.fill);
+      spawnCoin(x - 11, y - 11, enemy.maxHp);
+      playEnemyExplosionSound();
+      normalEnemyKills++;
+      maybeSpawnRewardDrop(x - 14, y - 14);
+    }
+
+    function activateShield() {
+      shieldActive = true;
+      shieldTimer = 60 * 5;
+    }
+
+    function applyPlayerDamage(amount, cooldown, explosionColor, shake, flash) {
+      if (shieldActive) return false;
+
+      createExplosion(player.x + player.w / 2, player.y + player.h / 2, 12, explosionColor);
+      lives -= amount;
+      player.hitCooldown = cooldown;
+      triggerScreenEffect(shake, 14, flash);
+
+      if (lives <= 0) {
+        endGame();
+      }
+
+      return true;
+    }
+
+    function explodeKamikaze(index) {
+      const enemy = enemies[index];
+      if (!enemy || enemy.exploding) return;
+
+      enemy.exploding = true;
+      const explosion = {
+        x: enemy.x + enemy.w / 2,
+        y: enemy.y + enemy.h / 2,
+        r: enemy.explosionRadius
+      };
+
+      createExplosion(explosion.x, explosion.y, 24, "#fb7185");
+      triggerScreenEffect(5, 12, "rgba(255, 180, 180, 0.18)");
+      enemies.splice(index, 1);
+
+      if (circleRectCollide(explosion, getPlayerHitbox())) {
+        applyPlayerDamage(1, 70, "#ffffff", 8, "rgba(255, 90, 90, 0.30)");
+      }
+    }
+
     function resetGame() {
       hideFinalBossCelebration();
       resizeCanvas();
@@ -1208,6 +1337,14 @@
       lives = 3;
       weaponLevel = 1;
       finalVictoryAchieved = false;
+      normalEnemyKills = 0;
+      shieldActive = false;
+      shieldTimer = 0;
+      screenShake = 0;
+      screenShakeStrength = 0;
+      flashTimer = 0;
+      flashDuration = 0;
+      flashColor = "#ffffff";
 
       enemySpawnRate = 52;
       enemyBaseSpeed = 1.65;
@@ -1225,8 +1362,11 @@
       enemies = [];
       coinDrops = [];
       weaponDrops = [];
+      shieldDrops = [];
+      lifeDrops = [];
       particles = [];
       stars = createStars(65);
+      enemyBullets = [];
       bossBullets = [];
       boss = null;
       currentBossTheme = 1;
@@ -1364,9 +1504,9 @@
       const h = 32;
       const x = Math.random() * (canvas.width - w);
       const colors = enemyColorByTier(tier);
-
-      const horizontalSpeed = enemyHorizontalFactor > 0
-        ? (Math.random() < 0.5 ? -1 : 1) * (0.35 + Math.random() * enemyHorizontalFactor)
+      const enemyType = createSpecialEnemyType();
+      const horizontalSpeed = enemyType === "zigzag"
+        ? (Math.random() < 0.5 ? -1 : 1) * (0.35 + Math.random() * Math.max(0.2, enemyHorizontalFactor))
         : 0;
 
       enemies.push({
@@ -1376,10 +1516,17 @@
         h,
         hp: tier,
         maxHp: tier,
-        speed: enemyBaseSpeed + Math.random() * 0.7 + tier * 0.09,
+        speed: enemyBaseSpeed + Math.random() * 0.7 + tier * 0.09 + (enemyType === "kamikaze" ? 0.2 : 0),
         colors,
         theme: currentBossTheme,
-        dx: horizontalSpeed
+        dx: horizontalSpeed,
+        enemyType,
+        fireCooldown: enemyType === "shooter" ? 85 + Math.floor(Math.random() * 50) : 0,
+        trackingStrength: enemyType === "tracker" ? 0.025 + Math.random() * 0.012 : 0,
+        trackingMax: enemyType === "tracker" ? 0.75 + Math.random() * 0.35 : 0,
+        kamikazeRange: enemyType === "kamikaze" ? 108 : 0,
+        explosionRadius: enemyType === "kamikaze" ? 52 : 0,
+        warningTimer: 0
       });
     }
 
@@ -1447,6 +1594,7 @@
 
       bossesSpawned.add(bossIndex);
       enemies = [];
+      enemyBullets = [];
       bossBullets = [];
       currentBossTheme = bossIndex;
       triggerBossIntro(bossIndex);
@@ -1755,8 +1903,48 @@
 
       for (let i = enemies.length - 1; i >= 0; i--) {
         const e = enemies[i];
+        const playerCenter = player.x + player.w / 2;
+        const enemyCenter = e.x + e.w / 2;
+        const verticalDistance = player.y - e.y;
+
         e.y += e.speed;
-        e.x += e.dx;
+
+        if (e.enemyType === "tracker") {
+          const follow = clamp((playerCenter - enemyCenter) * e.trackingStrength, -e.trackingMax, e.trackingMax);
+          e.x += follow;
+        } else if (e.enemyType === "shooter") {
+          e.x += Math.sin((frame + i * 11) * 0.03) * 0.35;
+          e.fireCooldown--;
+          if (e.fireCooldown <= 0 && enemyBullets.length < 10) {
+            enemyBullets.push({
+              x: e.x + e.w / 2,
+              y: e.y + e.h,
+              r: 5,
+              dx: 0,
+              dy: 2.6 + Math.min(1.2, elapsedSeconds * 0.01),
+              color: "#fdba74"
+            });
+            e.fireCooldown = 120 + Math.floor(Math.random() * 50);
+          }
+        } else if (e.enemyType === "kamikaze") {
+          const homingStrength = verticalDistance < 190 ? 0.06 : 0.03;
+          const maxShift = verticalDistance < 190 ? 1.35 : 0.8;
+          const follow = clamp((playerCenter - enemyCenter) * homingStrength, -maxShift, maxShift);
+          e.x += follow;
+          if (verticalDistance < 220) {
+            e.y += 0.45;
+            e.warningTimer = Math.min(24, e.warningTimer + 1);
+          } else {
+            e.warningTimer = Math.max(0, e.warningTimer - 1);
+          }
+
+          if (distanceBetween(enemyCenter, e.y + e.h / 2, playerCenter, player.y + player.h / 2) <= e.kamikazeRange) {
+            explodeKamikaze(i);
+            continue;
+          }
+        } else {
+          e.x += e.dx;
+        }
 
         if (e.dx !== 0) {
           if (e.x <= 0) {
@@ -1767,6 +1955,8 @@
             e.x = canvas.width - e.w;
             e.dx *= -1;
           }
+        } else if (e.x <= 0 || e.x + e.w >= canvas.width) {
+          e.x = clamp(e.x, 0, canvas.width - e.w);
         }
 
         if (e.y > canvas.height + 20) enemies.splice(i, 1);
@@ -1777,6 +1967,17 @@
       for (let i = coinDrops.length - 1; i >= 0; i--) {
         coinDrops[i].y += coinDrops[i].speed;
         if (coinDrops[i].y > canvas.height + 10) coinDrops.splice(i, 1);
+      }
+    }
+
+    function updateEnemyBullets() {
+      for (let i = enemyBullets.length - 1; i >= 0; i--) {
+        const bullet = enemyBullets[i];
+        bullet.x += bullet.dx;
+        bullet.y += bullet.dy;
+        if (bullet.y > canvas.height + 20 || bullet.x < -20 || bullet.x > canvas.width + 20) {
+          enemyBullets.splice(i, 1);
+        }
       }
     }
 
@@ -1800,6 +2001,34 @@
       }
     }
 
+    function updateShieldDrops() {
+      for (let i = shieldDrops.length - 1; i >= 0; i--) {
+        const drop = shieldDrops[i];
+        drop.sway += 0.08;
+        drop.x += drop.dx + Math.sin(drop.sway) * 0.35;
+        drop.y += drop.dy;
+        if (drop.x <= 0 || drop.x + drop.w >= canvas.width) {
+          drop.x = clamp(drop.x, 0, canvas.width - drop.w);
+          drop.dx *= -1;
+        }
+        if (drop.y > canvas.height + 20) shieldDrops.splice(i, 1);
+      }
+    }
+
+    function updateLifeDrops() {
+      for (let i = lifeDrops.length - 1; i >= 0; i--) {
+        const drop = lifeDrops[i];
+        drop.sway += 0.07;
+        drop.x += drop.dx + Math.sin(drop.sway) * 0.28;
+        drop.y += drop.dy;
+        if (drop.x <= 0 || drop.x + drop.w >= canvas.width) {
+          drop.x = clamp(drop.x, 0, canvas.width - drop.w);
+          drop.dx *= -1;
+        }
+        if (drop.y > canvas.height + 20) lifeDrops.splice(i, 1);
+      }
+    }
+
     function updateParticles() {
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
@@ -1807,6 +2036,31 @@
         p.y += p.dy;
         p.life -= 1;
         if (p.life <= 0) particles.splice(i, 1);
+      }
+    }
+
+    function updateShieldState() {
+      if (!shieldActive) return;
+      shieldTimer--;
+      if (shieldTimer <= 0) {
+        shieldActive = false;
+        shieldTimer = 0;
+      }
+    }
+
+    function updateScreenEffects() {
+      if (screenShake > 0) {
+        screenShake--;
+        screenShakeStrength *= 0.82;
+        if (screenShakeStrength < 0.2) screenShakeStrength = 0;
+      } else {
+        screenShakeStrength = 0;
+      }
+
+      if (flashTimer > 0) {
+        flashTimer--;
+      } else {
+        flashDuration = 0;
       }
     }
 
@@ -1900,9 +2154,7 @@
             }
 
             if (e.hp <= 0) {
-              createExplosion(e.x + e.w / 2, e.y + e.h / 2, 14, e.colors.fill);
-              spawnCoin(e.x + e.w / 2 - 11, e.y + e.h / 2 - 11, e.maxHp);
-              playEnemyExplosionSound();
+              handleEnemyDefeat(e, e.x + e.w / 2, e.y + e.h / 2);
               enemies.splice(j, 1);
             }
             break;
@@ -1934,6 +2186,7 @@
 
             playBossExplosionSound();
             createExplosion(boss.x + boss.w / 2, boss.y + boss.h / 2, 40, "#f59e0b");
+            triggerScreenEffect(10, 18, "rgba(255, 245, 180, 0.42)");
             for (let n = 0; n < 6; n++) {
               spawnCoin(
                 boss.x + 20 + Math.random() * (boss.w - 40),
@@ -1971,29 +2224,32 @@
       if (player.hitCooldown <= 0) {
         for (let i = enemies.length - 1; i >= 0; i--) {
           if (rectsCollide(playerHitbox, enemies[i])) {
-            createExplosion(player.x + player.w / 2, player.y + player.h / 2, 18, "#ffffff");
-            enemies.splice(i, 1);
-            lives--;
-            player.hitCooldown = 70;
-            if (lives <= 0) return endGame();
+            if (enemies[i].enemyType === "kamikaze") {
+              explodeKamikaze(i);
+            } else {
+              enemies.splice(i, 1);
+              if (applyPlayerDamage(1, 70, "#ffffff", 6, "rgba(255, 90, 90, 0.26)")) return;
+            }
             break;
           }
         }
 
         if (boss && rectsCollide(playerHitbox, boss)) {
-          createExplosion(player.x + player.w / 2, player.y + player.h / 2, 18, "#ffffff");
-          lives--;
-          player.hitCooldown = 70;
-          if (lives <= 0) return endGame();
+          if (applyPlayerDamage(1, 70, "#ffffff", 7, "rgba(255, 90, 90, 0.26)")) return;
         }
 
         for (let i = bossBullets.length - 1; i >= 0; i--) {
           if (circleRectCollide(bossBullets[i], playerHitbox)) {
             bossBullets.splice(i, 1);
-            createExplosion(player.x + player.w / 2, player.y + player.h / 2, 10, "#fca5a5");
-            lives--;
-            player.hitCooldown = 55;
-            if (lives <= 0) return endGame();
+            if (applyPlayerDamage(1, 55, "#fca5a5", 5, "rgba(255, 90, 90, 0.24)")) return;
+            break;
+          }
+        }
+
+        for (let i = enemyBullets.length - 1; i >= 0; i--) {
+          if (circleRectCollide(enemyBullets[i], playerHitbox)) {
+            enemyBullets.splice(i, 1);
+            if (applyPlayerDamage(1, 45, "#fdba74", 4, "rgba(255, 90, 90, 0.20)")) return;
             break;
           }
         }
@@ -2011,6 +2267,20 @@
           weaponDrops.splice(i, 1);
           const maxAvailable = maxWeaponLevelAvailableByCoins();
           if (weaponLevel < maxAvailable) weaponLevel++;
+        }
+      }
+
+      for (let i = shieldDrops.length - 1; i >= 0; i--) {
+        if (rectsCollide(player, shieldDrops[i])) {
+          shieldDrops.splice(i, 1);
+          activateShield();
+        }
+      }
+
+      for (let i = lifeDrops.length - 1; i >= 0; i--) {
+        if (rectsCollide(player, lifeDrops[i])) {
+          lifeDrops.splice(i, 1);
+          lives++;
         }
       }
     }
@@ -2057,6 +2327,8 @@
       updateStars();
       updatePlayer();
       updateBossIntro();
+      updateShieldState();
+      updateScreenEffects();
 
       if (frame % autoFireRate === 0) {
         fireWeapon();
@@ -2066,7 +2338,10 @@
       updateEnemies();
       updateCoinDrops();
       updateWeaponDrops();
+      updateShieldDrops();
+      updateLifeDrops();
       updateParticles();
+      updateEnemyBullets();
       updateBoss();
       updateBossBullets();
 
@@ -2243,6 +2518,21 @@
       ctx.closePath();
       ctx.fill();
 
+      if (shieldActive) {
+        const pulse = 2 + Math.sin(frame * 0.18) * 1.5;
+        ctx.strokeStyle = "rgba(125, 211, 252, 0.9)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(x + player.w / 2, y + player.h / 2, player.w * 0.48 + pulse, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(224, 242, 254, 0.45)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(x + player.w / 2, y + player.h / 2, player.w * 0.38 + pulse * 0.5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
       ctx.restore();
     }
 
@@ -2304,6 +2594,29 @@
     function drawEnemies() {
       for (const e of enemies) {
         drawMiniEnemy(e);
+
+        if (e.enemyType === "tracker") {
+          ctx.strokeStyle = "rgba(191, 219, 254, 0.5)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(e.x + 6, e.y + e.h - 5);
+          ctx.lineTo(e.x + e.w - 6, e.y + e.h - 5);
+          ctx.stroke();
+        }
+
+        if (e.enemyType === "shooter") {
+          ctx.fillStyle = "#fed7aa";
+          ctx.fillRect(e.x + e.w / 2 - 4, e.y + e.h - 6, 8, 10);
+        }
+
+        if (e.enemyType === "kamikaze") {
+          const pulse = 1 + Math.sin((frame + e.y) * 0.15) * 0.16;
+          ctx.strokeStyle = e.warningTimer > 8 ? "rgba(251, 113, 133, 0.7)" : "rgba(251, 113, 133, 0.38)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(e.x + e.w / 2, e.y + e.h / 2, (e.explosionRadius - 12) * pulse, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
     }
 
@@ -2343,12 +2656,62 @@
       }
     }
 
+    function drawShieldDrops() {
+      for (const drop of shieldDrops) {
+        ctx.fillStyle = "#0ea5e9";
+        ctx.beginPath();
+        ctx.arc(drop.x + drop.w / 2, drop.y + drop.h / 2, drop.w / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#e0f2fe";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(drop.x + drop.w / 2, drop.y + drop.h / 2, drop.w / 2 - 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 14px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("S", drop.x + drop.w / 2, drop.y + drop.h / 2 + 5);
+      }
+    }
+
+    function drawLifeDrops() {
+      for (const drop of lifeDrops) {
+        ctx.fillStyle = "#ef4444";
+        ctx.beginPath();
+        ctx.arc(drop.x + drop.w * 0.35, drop.y + drop.h * 0.38, 6, 0, Math.PI * 2);
+        ctx.arc(drop.x + drop.w * 0.65, drop.y + drop.h * 0.38, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(drop.x + drop.w * 0.17, drop.y + drop.h * 0.44);
+        ctx.lineTo(drop.x + drop.w * 0.5, drop.y + drop.h - 2);
+        ctx.lineTo(drop.x + drop.w * 0.83, drop.y + drop.h * 0.44);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "#fecaca";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+
     function drawParticles() {
       for (const p of particles) {
         ctx.globalAlpha = Math.max(0, p.life / 40);
         ctx.fillStyle = p.color;
         ctx.fillRect(p.x, p.y, p.size, p.size);
         ctx.globalAlpha = 1;
+      }
+    }
+
+    function drawEnemyBullets() {
+      for (const bullet of enemyBullets) {
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, bullet.r, 0, Math.PI * 2);
+        ctx.fillStyle = bullet.color;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, Math.max(2, bullet.r - 2), 0, Math.PI * 2);
+        ctx.fillStyle = "#fff7ed";
+        ctx.fill();
       }
     }
 
@@ -2494,17 +2857,36 @@
       ctx.restore();
     }
 
+    function drawFlashOverlay() {
+      if (flashTimer <= 0 || flashDuration <= 0) return;
+      ctx.save();
+      ctx.globalAlpha = Math.min(0.38, flashTimer / flashDuration);
+      ctx.fillStyle = flashColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    }
+
     function draw() {
+      const shakeX = screenShake > 0 ? (Math.random() - 0.5) * screenShakeStrength : 0;
+      const shakeY = screenShake > 0 ? (Math.random() - 0.5) * screenShakeStrength : 0;
+
+      ctx.save();
+      ctx.translate(shakeX, shakeY);
       drawBackground();
       drawCoinDrops();
       drawWeaponDrops();
+      drawShieldDrops();
+      drawLifeDrops();
       drawBullets();
+      drawEnemyBullets();
       drawEnemies();
       drawBoss();
       drawBossBullets();
       drawParticles();
       drawPlayer();
       drawBossIntro();
+      ctx.restore();
+      drawFlashOverlay();
     }
 
     function loop() {
