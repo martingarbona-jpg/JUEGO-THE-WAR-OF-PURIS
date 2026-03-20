@@ -1201,7 +1201,7 @@
     }
 
     function weaponDamage(level) {
-      if (level === 6) return 10;
+      if (level === 6) return 12;
       return level;
     }
 
@@ -1975,11 +1975,11 @@
       }
 
       if (weaponLevel === 4) {
-        bullets.push({ x: centerX - 6.5, y: 0, w: 13, h: player.y + 10, speed: 0, damage: dmg, type: "laser-red", color: "#ef4444", life: 2 });
+        bullets.push({ x: centerX - 9.5, y: 0, w: 19, h: player.y + 10, speed: 0, damage: dmg, type: "laser-red", color: "#ef4444", life: 2 });
       }
 
       if (weaponLevel === 5) {
-        bullets.push({ x: centerX - 8, y: 0, w: 16, h: player.y + 10, speed: 0, damage: dmg, type: "laser-gold", color: "#facc15", life: 2 });
+        bullets.push({ x: centerX - 12, y: 0, w: 24, h: player.y + 10, speed: 0, damage: dmg, type: "laser-gold", color: "#facc15", life: 2 });
       }
 
       if (weaponLevel === 6) {
