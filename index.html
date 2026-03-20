@@ -2,30 +2,37 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>PURIS VS LAS MAQUINAS</title>
   <style>
     * { box-sizing: border-box; }
 
     html,
     body {
-      min-height: 100%;
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      min-height: 100vh;
+      min-height: 100dvh;
       overflow: hidden;
       overscroll-behavior: none;
+      -webkit-overflow-scrolling: auto;
+      touch-action: manipulation;
     }
 
     body {
-      margin: 0;
       font-family: Arial, sans-serif;
       background: radial-gradient(circle at top, #1e293b 0%, #0f172a 45%, #020617 100%);
       color: white;
-      min-height: 100vh;
-      min-height: 100dvh;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 10px;
-      touch-action: none;
+      position: relative;
     }
 
     .wrap {
@@ -81,6 +88,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      overflow: hidden;
     }
 
     .stage {
@@ -385,6 +393,40 @@
       background: #16a34a;
     }
 
+    .start-panel {
+      max-width: 520px;
+      padding: 28px 24px;
+      background:
+        radial-gradient(circle at top, rgba(56, 189, 248, 0.18), transparent 42%),
+        rgba(2, 6, 23, 0.96);
+      border-color: rgba(56, 189, 248, 0.28);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.42);
+    }
+
+    .start-title {
+      margin: 0 0 12px;
+      font-size: clamp(34px, 5vw, 48px);
+      line-height: 1.05;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      text-shadow: 0 0 18px rgba(56, 189, 248, 0.35);
+    }
+
+    .start-text {
+      margin: 0 0 22px;
+      color: #cbd5e1;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .start-btn {
+      min-width: min(100%, 240px);
+      padding: 16px 24px;
+      font-size: 20px;
+      letter-spacing: 1px;
+      box-shadow: 0 10px 26px rgba(34, 197, 94, 0.28);
+    }
+
     .btn-secondary {
       background: #334155;
       color: white;
@@ -404,6 +446,12 @@
 
     .mobile-controls {
       display: none;
+      gap: 12px;
+      padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+      background: rgba(2, 6, 23, 0.96);
+      border-top: 1px solid rgba(148, 163, 184, 0.18);
+      box-shadow: 0 -10px 28px rgba(0,0,0,0.26);
+      flex-shrink: 0;
     }
 
     .mobile-btn {
@@ -417,6 +465,7 @@
       user-select: none;
       -webkit-user-select: none;
       touch-action: manipulation;
+      min-height: 72px;
     }
 
     @media (max-width: 768px) {
@@ -433,7 +482,7 @@
 
       body.mobile-ui .canvas-box {
         flex: 1;
-        min-height: 100dvh;
+        min-height: 0;
       }
 
       body.mobile-ui .hud {
@@ -463,6 +512,24 @@
       body.mobile-ui .help {
         display: none;
       }
+
+      body.mobile-ui.game-active .mobile-controls {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      body.mobile-ui.game-active .mobile-btn {
+        font-size: 28px;
+      }
+
+      body.mobile-ui .start-panel {
+        max-width: 100%;
+        padding: 24px 20px;
+      }
+
+      body.mobile-ui .start-title {
+        font-size: clamp(28px, 8vw, 38px);
+      }
     }
 
     @media (max-width: 768px) and (orientation: landscape) {
@@ -482,7 +549,7 @@
   </style>
 </head>
 <body>
-  <div class="wrap">
+  <div class="wrap" id="appRoot">
     <div class="canvas-box">
       <div class="stage" id="stage">
         <canvas id="game" width="900" height="540"></canvas>
@@ -523,18 +590,15 @@
         <button id="pauseBtn" type="button" aria-label="Pausar juego">⏸</button>
 
         <div class="overlay show" id="overlay">
-          <div class="panel">
-            <h1 id="overlayTitle">PURIS VS LAS MAQUINAS</h1>
-            <p id="overlayText">
-              Boss 1 a los 30 segundos.<br>
-              Boss 2 a los 40 segundos de matar al Boss 1.<br>
-              Boss 3 a los 60 segundos de matar al Boss 2.<br>
-              La W mejora el arma y también transforma la nave.
+          <div class="panel start-panel">
+            <h1 class="start-title" id="overlayTitle">LA BATALLA DEL PURIS</h1>
+            <p class="start-text" id="overlayText">
+              Entrá en combate cuando estés listo. Al tocar JUGAR se intentará abrir el juego en fullscreen para aprovechar mejor la pantalla del celular.
             </p>
             <p class="overlay-extra" id="overlayExtra" hidden></p>
             <div class="btns">
-              <button class="btn-primary" id="startBtn">Empezar</button>
-              <button class="btn-secondary" id="restartBtn">Reiniciar</button>
+              <button class="btn-primary start-btn" id="startBtn">JUGAR</button>
+              <button class="btn-secondary" id="restartBtn" hidden>Reiniciar</button>
             </div>
           </div>
         </div>
@@ -562,13 +626,19 @@
       </div>
     </div>
 
+    <div class="mobile-controls" id="mobileControls" aria-label="Controles móviles">
+      <button class="mobile-btn" id="moveLeftBtn" type="button" aria-label="Mover a la izquierda">⬅</button>
+      <button class="mobile-btn" id="moveRightBtn" type="button" aria-label="Mover a la derecha">➡</button>
+    </div>
+
     <div class="help">
-      PC: ← → o A / D &nbsp; | &nbsp; Celular: tocá la mitad izquierda o derecha del juego
+      PC: ← → o A / D &nbsp; | &nbsp; Celular: usá los botones inferiores para mover la nave
     </div>
   </div>
 
   <script>
     const canvas = document.getElementById("game");
+    const appRoot = document.getElementById("appRoot");
     const canvasBox = document.querySelector(".canvas-box");
     const stage = document.getElementById("stage");
     const ctx = canvas.getContext("2d");
@@ -587,13 +657,15 @@
     const overlayText = document.getElementById("overlayText");
     const overlayExtra = document.getElementById("overlayExtra");
     const startBtn = document.getElementById("startBtn");
-    const restartBtn = document.getElementById("restartBtn");
     const orientationOverlay = document.getElementById("orientationOverlay");
     const celebrationOverlay = document.getElementById("celebrationOverlay");
     const celebrationCanvas = document.getElementById("celebrationCanvas");
     const celebrationCtx = celebrationCanvas.getContext("2d");
 
     const pauseBtn = document.getElementById("pauseBtn");
+    const restartBtn = document.getElementById("restartBtn");
+    const moveLeftBtn = document.getElementById("moveLeftBtn");
+    const moveRightBtn = document.getElementById("moveRightBtn");
 
     const UPGRADE_STEPS = [25, 75, 150, 300, 600];
     const FIRST_BOSS_TIME = 30;
@@ -711,8 +783,13 @@
       return MOBILE_BREAKPOINT.matches ? MOBILE_WORLD : DESKTOP_WORLD;
     }
 
-    function syncMobileViewportState() {
+    function syncGameUiState() {
       document.body.classList.toggle("mobile-ui", isMobileDevice());
+      document.body.classList.toggle("game-active", running && !overlay.classList.contains("show"));
+    }
+
+    function syncMobileViewportState() {
+      syncGameUiState();
     }
 
     function resizeCanvas() {
@@ -1070,10 +1147,25 @@
       draw();
     }
 
+    function showStartScreen() {
+      running = false;
+      isPaused = false;
+      overlayTitle.textContent = "LA BATALLA DEL PURIS";
+      overlayText.innerHTML = "Entrá en combate cuando estés listo.<br>Al tocar <strong>JUGAR</strong> se intentará abrir el juego en fullscreen para aprovechar mejor la pantalla del celular.";
+      overlayExtra.hidden = true;
+      overlayExtra.textContent = "";
+      startBtn.textContent = "JUGAR";
+      restartBtn.hidden = true;
+      overlay.classList.add("show");
+      syncGameUiState();
+    }
+
     function startGame() {
       resetGame();
       running = true;
       overlay.classList.remove("show");
+      restartBtn.hidden = false;
+      syncGameUiState();
       syncOrientationOverlay();
       loop();
     }
@@ -1098,7 +1190,9 @@
         ? 'Desarrollado por <strong>"Tu padre"</strong> para <strong>"Su preferido"</strong> ❤️ Te amo'
         : "";
       startBtn.textContent = "Jugar de nuevo";
+      restartBtn.hidden = false;
       overlay.classList.add("show");
+      syncGameUiState();
     }
 
     function rectsCollide(a, b) {
@@ -1303,7 +1397,7 @@
     }
 
     function canUseTouchControls() {
-      return running && !isPaused && !shouldBlockPortraitMobile() && !overlay.classList.contains("show") && !celebrationOverlay.classList.contains("show");
+      return running && !isPaused && !isMobileDevice() && !shouldBlockPortraitMobile() && !overlay.classList.contains("show") && !celebrationOverlay.classList.contains("show");
     }
 
     function moveByTouchPoint(clientX) {
@@ -1348,6 +1442,61 @@
       activeTouchId = null;
       releaseMove();
       e.preventDefault();
+    }
+
+
+    function requestGameFullscreen() {
+      if (!isMobileDevice()) return Promise.resolve(false);
+
+      const targets = [appRoot, document.documentElement].filter(Boolean);
+      for (const target of targets) {
+        const request = target.requestFullscreen || target.webkitRequestFullscreen;
+        if (typeof request !== "function") continue;
+
+        try {
+          const result = request.call(target);
+          if (result && typeof result.then === "function") {
+            return result.then(() => true).catch(() => false);
+          }
+          return Promise.resolve(true);
+        } catch (error) {
+          // Intento siguiente fallback disponible.
+        }
+      }
+
+      return Promise.resolve(false);
+    }
+
+    function primeMobileViewport() {
+      window.scrollTo(0, 0);
+      if (window.visualViewport && typeof window.visualViewport.offsetTop === "number" && window.visualViewport.offsetTop > 0) {
+        window.scrollTo(0, window.visualViewport.offsetTop);
+      }
+    }
+
+    function handleGameEntry() {
+      unlockAudio();
+      primeMobileViewport();
+      requestGameFullscreen();
+      startGame();
+    }
+
+    function bindPressControl(button, onPress) {
+      if (!button) return;
+
+      const stop = (event) => {
+        event.preventDefault();
+        releaseMove();
+      };
+
+      button.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        onPress();
+      });
+      button.addEventListener("pointerup", stop);
+      button.addEventListener("pointercancel", stop);
+      button.addEventListener("pointerleave", stop);
+      button.addEventListener("lostpointercapture", stop);
     }
 
     function createCelebrationParticles(reset = true) {
@@ -2349,10 +2498,11 @@
 
     window.addEventListener("pointerdown", unlockAudio, { passive: true });
     window.addEventListener("keydown", unlockAudio, { passive: true });
-    startBtn.addEventListener("click", unlockAudio);
-    restartBtn.addEventListener("click", unlockAudio);
-    startBtn.addEventListener("click", startGame);
-    restartBtn.addEventListener("click", startGame);
+    startBtn.addEventListener("click", handleGameEntry);
+    restartBtn.addEventListener("click", handleGameEntry);
+
+    bindPressControl(moveLeftBtn, pressLeft);
+    bindPressControl(moveRightBtn, pressRight);
 
     window.addEventListener("resize", resizeCanvas);
     if (window.visualViewport) {
@@ -2361,11 +2511,12 @@
 
     document.addEventListener("touchmove", (event) => {
       if (!isMobileDevice()) return;
-      if (event.target.closest("#stage") || event.target.closest("#pauseBtn")) return;
+      if (event.target.closest("#stage") || event.target.closest("#pauseBtn") || event.target.closest("#mobileControls")) return;
       event.preventDefault();
     }, { passive: false });
 
     resetGame();
+    showStartScreen();
   </script>
 </body>
 </html>
