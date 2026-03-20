@@ -122,26 +122,25 @@
       left: 10px;
       z-index: 1001;
       align-items: center;
-      gap: 6px;
-      padding: 6px 10px;
+      gap: 4px;
+      padding: 4px 8px;
       border-radius: 999px;
-      background: rgba(2, 6, 23, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+      background: rgba(2, 6, 23, 0.38);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.16);
       pointer-events: none;
-      backdrop-filter: blur(4px);
-    }
-
-    .mobile-lives-label {
-      font-size: 14px;
       line-height: 1;
     }
 
+    .mobile-lives-label {
+      font-size: 12px;
+    }
+
     .mobile-lives-value {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
-      letter-spacing: 0.4px;
       color: #fff;
+      font-variant-numeric: tabular-nums;
     }
 
     .overlay-extra {
@@ -486,7 +485,7 @@
       }
 
       body.mobile-ui .hud {
-        display: none;
+        display: none !important;
       }
 
       body.mobile-ui .mobile-lives {
@@ -533,12 +532,6 @@
     }
 
     @media (max-width: 768px) and (orientation: landscape) {
-      body.mobile-ui .mobile-lives {
-        top: 8px;
-        left: 8px;
-        padding: 5px 9px;
-      }
-
       body.mobile-ui #pauseBtn {
         top: 6px;
         right: 6px;
@@ -553,7 +546,7 @@
     <div class="canvas-box">
       <div class="stage" id="stage">
         <canvas id="game" width="900" height="540"></canvas>
-        <div class="mobile-lives" id="mobileLives" aria-label="Vidas">
+        <div class="mobile-lives" id="mobileLives" aria-label="Vidas" aria-live="polite">
           <span class="mobile-lives-label" aria-hidden="true">❤️</span>
           <span class="mobile-lives-value" id="mobileLivesValue">3</span>
         </div>
