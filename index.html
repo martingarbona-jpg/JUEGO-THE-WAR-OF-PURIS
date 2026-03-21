@@ -1458,10 +1458,10 @@
     }
 
     function bossAggressionMultiplier(type) {
-      // Rebalance de bosses 1 y 2: un toque más de presión sin tocar la lógica nueva de la ulti.
-      if (type === 1) return 1.08;
-      if (type === 2) return 1.14;
-      if (type === 3) return 1.2;
+      // Ajuste fino de agresividad: Boss 1 y 2 se acercan al ritmo del boss siguiente; Boss 3 sube un poco sin tocar Boss 4.
+      if (type === 1) return 1.12;
+      if (type === 2) return 1.2;
+      if (type === 3) return 1.24;
       return 1.28;
     }
 
@@ -2055,17 +2055,18 @@
       currentBossTheme = bossIndex;
       triggerBossIntro(bossIndex);
 
-      // Rebalance de vida de bosses: valores exactos pedidos para compensar la ulti con escudo.
+      // Cambio de vida de bosses: Boss 1 = 500, Boss 2 = 1750, Boss 3 = 2500; Boss 4 queda igual.
       const hp =
-        bossIndex === 1 ? 300 :
-        bossIndex === 2 ? 1000 :
-        bossIndex === 3 ? 1750 :
+        bossIndex === 1 ? 500 :
+        bossIndex === 2 ? 1750 :
+        bossIndex === 3 ? 2500 :
         3000;
 
+      // Ajuste de presión base: Boss 1 toma el ritmo del Boss 2 actual, Boss 2 se acerca al Boss 3 actual, Boss 3 sube un poco y Boss 4 queda igual.
       const moveSpeed =
-        bossIndex === 1 ? 1.15 :
-        bossIndex === 2 ? 1.62 :
-        bossIndex === 3 ? 1.84 :
+        bossIndex === 1 ? 1.52 :
+        bossIndex === 2 ? 1.84 :
+        bossIndex === 3 ? 1.96 :
         2.26;
       const aggressionMultiplier = bossAggressionMultiplier(bossIndex);
 
@@ -2550,10 +2551,12 @@
       if (boss.fireCooldown <= 0) {
         fireBossPattern();
         const baseCooldown =
-          // Rebalance de bosses 1 y 2: apenas más frecuencia para que vuelvan a sentirse tensos.
-          boss.type === 1 ? 118 :
-          boss.type === 2 ? 74 :
-          boss.type === 3 ? 66 :
+          // Ajuste del comportamiento del Boss 1: ahora entra en cadencia similar al Boss 2 anterior, pero un poco más legible.
+          // Ajuste del comportamiento del Boss 2: ahora dispara con la presión base que antes tenía el Boss 3.
+          // Ajuste del comportamiento del Boss 3: gana un poco más de frecuencia, sin tocar el patrón general del Boss 4.
+          boss.type === 1 ? 84 :
+          boss.type === 2 ? 66 :
+          boss.type === 3 ? 58 :
           50;
         boss.fireCooldown = Math.max(20, Math.round(baseCooldown / bossAggressionMultiplier(boss.type)));
       }
@@ -2570,16 +2573,19 @@
       let radius = 6;
 
       if (boss.type === 1) {
-        pattern = [-0.34, 0, 0.34];
-        speed = 1.36;
+        // Ajuste del comportamiento del Boss 1: pasa a 4 proyectiles y más velocidad, inspirado en el Boss 2 anterior.
+        pattern = [-0.5, -0.16, 0.16, 0.5];
+        speed = 1.7;
         radius = 6;
       } else if (boss.type === 2) {
-        pattern = [-0.58, -0.2, 0.2, 0.58];
-        speed = 1.8;
-        radius = 6;
-      } else if (boss.type === 3) {
+        // Ajuste del comportamiento del Boss 2: adopta la presión de abanico del Boss 3 anterior.
         pattern = [-0.84, -0.42, 0, 0.42, 0.84];
         speed = 1.84;
+        radius = 7;
+      } else if (boss.type === 3) {
+        // Ajuste del comportamiento del Boss 3: un paso intermedio entre el Boss 3 anterior y el Boss 4 actual.
+        pattern = [-0.92, -0.56, -0.2, 0.2, 0.56, 0.92];
+        speed = 2;
         radius = 7;
       } else {
         pattern = [-1.04, -0.7, -0.34, 0, 0.34, 0.7, 1.04];
