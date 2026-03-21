@@ -109,53 +109,6 @@
       user-select: none;
     }
 
-    /* Visibilidad persistente: este contenedor vive en el layout general del juego, no dentro del overlay del menú. */
-    .mobile-controls {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 1090;
-      display: none;
-    }
-
-    .mobile-move-btn {
-      position: absolute;
-      top: var(--mobile-control-top);
-      transform: translateY(-50%);
-      width: clamp(72px, 10vw, 104px);
-      height: clamp(72px, 10vw, 104px);
-      border-radius: 999px;
-      border: 2px solid rgba(255, 255, 255, 0.26);
-      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.34), rgba(15, 23, 42, 0.92));
-      color: #f8fafc;
-      font-size: clamp(32px, 4vw, 42px);
-      font-weight: 900;
-      line-height: 1;
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.34);
-      pointer-events: auto;
-      opacity: 0.92;
-      touch-action: none;
-      user-select: none;
-      -webkit-user-select: none;
-      transition: transform 120ms ease, opacity 120ms ease, box-shadow 120ms ease, background 120ms ease;
-    }
-
-    .mobile-move-btn--left {
-      left: max(8px, calc(var(--stage-left-gap) / 2 - clamp(36px, 5vw, 52px)));
-    }
-
-    .mobile-move-btn--right {
-      right: max(8px, calc(var(--stage-right-gap) / 2 - clamp(36px, 5vw, 52px)));
-    }
-
-    .mobile-move-btn.is-pressed,
-    .mobile-move-btn:active {
-      transform: translateY(-50%) scale(0.94);
-      opacity: 1;
-      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.5), rgba(8, 145, 178, 0.96));
-      box-shadow: 0 0 0 3px rgba(103, 232, 249, 0.14), 0 12px 30px rgba(0, 0, 0, 0.38);
-    }
-
     #pauseBtn {
       position: absolute;
       top: 10px;
@@ -782,22 +735,6 @@
         display: none;
       }
 
-      body.mobile-ui.landscape-controls-visible .mobile-controls {
-        display: block;
-      }
-
-      body.mobile-ui.landscape-controls-visible .mobile-move-btn {
-        top: clamp(54%, calc(var(--mobile-control-top) + 2%), 68%);
-      }
-
-      body.mobile-ui.landscape-controls-visible .mobile-move-btn--left {
-        left: max(10px, calc(var(--stage-left-gap) / 2 - clamp(34px, 5vw, 50px)));
-      }
-
-      body.mobile-ui.landscape-controls-visible .mobile-move-btn--right {
-        right: max(10px, calc(var(--stage-right-gap) / 2 - clamp(34px, 5vw, 50px)));
-      }
-
       body.mobile-ui .start-panel {
         max-width: 100%;
         padding: 24px 20px;
@@ -857,22 +794,12 @@
         padding: 6px 9px;
       }
 
-      body.mobile-ui.landscape-controls-visible .mobile-move-btn {
-        width: clamp(76px, 11vw, 108px);
-        height: clamp(76px, 11vw, 108px);
-        font-size: clamp(34px, 4.4vw, 44px);
-      }
     }
   </style>
 </head>
 <body>
   <div class="wrap" id="appRoot">
     <div class="canvas-box" id="canvasBox">
-      <!-- Botones visibles restaurados acá: quedan fuera del área jugable usando los márgenes laterales del layout. -->
-      <div class="mobile-controls" id="mobileControls" aria-label="Controles de movimiento móviles">
-        <button class="mobile-move-btn mobile-move-btn--left" id="moveLeftBtn" type="button" aria-label="Mover a la izquierda">←</button>
-        <button class="mobile-move-btn mobile-move-btn--right" id="moveRightBtn" type="button" aria-label="Mover a la derecha">→</button>
-      </div>
       <div class="stage" id="stage">
         <canvas id="game" width="900" height="540"></canvas>
         <div class="mobile-lives" id="mobileLives" aria-label="Estado del jugador" aria-live="polite">
@@ -982,9 +909,6 @@
     const appRoot = document.getElementById("appRoot");
     const canvasBox = document.getElementById("canvasBox");
     const stage = document.getElementById("stage");
-    const mobileControls = document.getElementById("mobileControls");
-    const moveLeftBtn = document.getElementById("moveLeftBtn");
-    const moveRightBtn = document.getElementById("moveRightBtn");
     const ctx = canvas.getContext("2d");
 
     const coinsEl = document.getElementById("coins");
@@ -1084,8 +1008,7 @@
     let lastStageWidth = 0;
     let lastStageHeight = 0;
     let autoPausedByOrientation = false;
-    let activeTouchId = null;
-    let activeMoveDirection = null;
+    let activeMoveTouchId = null;
     let moveLeft = false;
     let moveRight = false;
     let mobileUiLocked = false;
@@ -1172,10 +1095,8 @@
 
     function syncGameUiState() {
       const shouldUseMobileUi = mobileUiLocked || isMobileDevice();
-      const showLandscapeControls = shouldUseMobileUi && isLandscapeMobile();
       document.body.classList.toggle("mobile-ui", shouldUseMobileUi);
       document.body.classList.toggle("game-active", running && !overlay.classList.contains("show"));
-      document.body.classList.toggle("landscape-controls-visible", showLandscapeControls);
 
       if (document.body.className !== lastLoggedBodyClassName) {
         console.log("[syncGameUiState] body.className =", document.body.className);
@@ -1183,31 +1104,8 @@
       }
     }
 
-    function syncPersistentMobileControlsVisibility(hasSideMargins = true) {
-      const shouldShowControls = document.body.classList.contains("mobile-ui") && isLandscapeMobile() && hasSideMargins;
-      mobileControls.style.display = shouldShowControls ? "block" : "none";
-      mobileControls.setAttribute("aria-hidden", shouldShowControls ? "false" : "true");
-    }
-
-    function updateMobileControlsLayout() {
-      const canvasRect = canvasBox.getBoundingClientRect();
-      const stageRect = stage.getBoundingClientRect();
-      const leftGap = Math.max(0, stageRect.left - canvasRect.left);
-      const rightGap = Math.max(0, canvasRect.right - stageRect.right);
-      const controlCenterY = clamp(stageRect.top - canvasRect.top + stageRect.height * 0.58, 0, canvasRect.height);
-      const gutterSize = parseFloat(getComputedStyle(canvasBox).getPropertyValue("--mobile-side-gutter")) || 0;
-
-      const hasSideMargins = leftGap >= 24 && rightGap >= 24 && gutterSize >= 24;
-
-      canvasBox.style.setProperty("--stage-left-gap", `${leftGap}px`);
-      canvasBox.style.setProperty("--stage-right-gap", `${rightGap}px`);
-      canvasBox.style.setProperty("--mobile-control-top", `${controlCenterY}px`);
-      syncPersistentMobileControlsVisibility(hasSideMargins);
-    }
-
     function syncMobileViewportState() {
       syncGameUiState();
-      updateMobileControlsLayout();
     }
 
     function resizeCanvas() {
@@ -1215,8 +1113,7 @@
       syncOrientationOverlay();
       const rect = canvasBox.getBoundingClientRect();
       const canvasBoxStyles = getComputedStyle(canvasBox);
-      // Diagnóstico corregido acá: el stage antes se escalaba con el ancho total del contenedor,
-      // así que al iniciar/fullscreeen en móvil se comía los márgenes y los botones quedaban sin espacio visible.
+      // El cálculo de tamaño sigue tomando el stage real visible, así la zona táctil se mantiene alineada tras resize/fullscreen.
       const availableWidth = rect.width - parseFloat(canvasBoxStyles.paddingLeft || 0) - parseFloat(canvasBoxStyles.paddingRight || 0);
       const availableHeight = rect.height - parseFloat(canvasBoxStyles.paddingTop || 0) - parseFloat(canvasBoxStyles.paddingBottom || 0);
       const { width: nextWidth, height: nextHeight } = getTargetWorldSize();
@@ -1230,7 +1127,6 @@
 
       stage.style.width = `${nextStageWidth}px`;
       stage.style.height = `${nextStageHeight}px`;
-      updateMobileControlsLayout();
 
       if (
         nextWidth === prevWidth &&
@@ -2231,24 +2127,43 @@
       player.dx = moveLeft ? -player.speed : player.speed;
     }
 
-    function syncMoveButtonsPressedState() {
-      moveLeftBtn.classList.toggle("is-pressed", activeMoveDirection === "left");
-      moveRightBtn.classList.toggle("is-pressed", activeMoveDirection === "right");
+    // Conflicto con pausa y ulti evitado acá: si el toque cae sobre esos botones, no se activa el movimiento lateral.
+    function isTouchMovementTargetBlocked(target, clientX, clientY) {
+      if (target?.closest?.("#pauseBtn, #ultimateBtn")) return true;
+
+      const pointHitsControl = (element) => {
+        if (!element) return false;
+        const rect = element.getBoundingClientRect();
+        return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+      };
+
+      return pointHitsControl(pauseBtn) || pointHitsControl(ultimateBtn);
     }
 
-    // Touch/pointer de izquierda/derecha conectado acá: cada botón visible mantiene el movimiento mientras se lo mantiene presionado.
-    function setActiveMoveDirection(direction) {
-      activeMoveDirection = direction;
-      if (direction === "left") {
-        pressLeft();
-      } else if (direction === "right") {
-        pressRight();
-      } else {
-        releaseMove();
+    // Mitad izquierda / mitad derecha implementado acá: leemos la X real dentro del área jugable visible y activamos una sola dirección.
+    function updateTouchMoveDirectionFromPoint(clientX, clientY, target) {
+      if (!canUseTouchControls() || isTouchMovementTargetBlocked(target, clientX, clientY)) {
+        return false;
       }
-      syncMoveButtonsPressedState();
-    }
 
+      const stageRect = stage.getBoundingClientRect();
+      if (
+        clientX < stageRect.left ||
+        clientX > stageRect.right ||
+        clientY < stageRect.top ||
+        clientY > stageRect.bottom
+      ) {
+        return false;
+      }
+
+      const relativeX = clientX - stageRect.left;
+      if (relativeX < stageRect.width / 2) {
+        pressLeft();
+      } else {
+        pressRight();
+      }
+      return true;
+    }
 
     function requestGameFullscreen() {
       if (!isMobileDevice()) return Promise.resolve(false);
@@ -3656,13 +3571,12 @@
       applyMoveState();
     }
 
+    // Limpieza al soltar/cancelar implementada acá: siempre resetea flags y dedo activo para frenar la nave.
     function releaseMove() {
-      activeMoveDirection = null;
-      activeTouchId = null;
+      activeMoveTouchId = null;
       moveLeft = false;
       moveRight = false;
       applyMoveState();
-      syncMoveButtonsPressedState();
     }
 
     document.addEventListener("keydown", (e) => {
@@ -3702,56 +3616,85 @@
       if (["arrowleft", "arrowright", "a", "d"].includes(k)) releaseMove();
     });
 
-    function bindMoveButton(button, direction) {
-      // Touch/pointer durante gameplay corregido acá: se captura el gesto al presionar y se libera recién al soltar/cancelar.
-      const startMove = (event) => {
-        if (!canUseTouchControls()) return;
-        const pointerId = event.pointerId ?? event.changedTouches?.[0]?.identifier ?? direction;
-        activeTouchId = pointerId;
-        if (event.pointerId !== undefined && typeof button.setPointerCapture === "function") {
-          button.setPointerCapture(event.pointerId);
-        }
-        setActiveMoveDirection(direction);
-        event.preventDefault();
-      };
-
-      const stopMove = (event) => {
-        const pointerId = event.pointerId ?? event.changedTouches?.[0]?.identifier ?? direction;
-        if (activeTouchId !== null && pointerId !== activeTouchId && pointerId !== direction) return;
-        if (event.pointerId !== undefined && typeof button.releasePointerCapture === "function" && button.hasPointerCapture?.(event.pointerId)) {
-          button.releasePointerCapture(event.pointerId);
-        }
-        releaseMove();
-        event.preventDefault();
-      };
-
-      button.addEventListener("pointerdown", startMove, { passive: false });
-      button.addEventListener("pointerup", stopMove, { passive: false });
-      button.addEventListener("pointercancel", stopMove, { passive: false });
-      button.addEventListener("touchstart", startMove, { passive: false });
-      button.addEventListener("touchend", stopMove, { passive: false });
-      button.addEventListener("touchcancel", stopMove, { passive: false });
-      button.addEventListener("mousedown", startMove);
-      button.addEventListener("mouseup", stopMove);
-      button.addEventListener("mouseleave", (event) => {
-        if (event.buttons === 0) stopMove(event);
-      });
-    }
-
-    bindMoveButton(moveLeftBtn, "left");
-    bindMoveButton(moveRightBtn, "right");
-
-    const stopTouchMoveControls = (event) => {
-      if (activeTouchId === null) return;
-      const pointerId = event.pointerId ?? event.changedTouches?.[0]?.identifier ?? activeTouchId;
-      if (pointerId !== activeTouchId && pointerId !== "left" && pointerId !== "right") return;
-      releaseMove();
+    const handleStagePointerStart = (event) => {
+      if (!canUseTouchControls() || event.pointerType === "mouse") return;
+      if (activeMoveTouchId !== null && activeMoveTouchId !== event.pointerId) return;
+      const started = updateTouchMoveDirectionFromPoint(event.clientX, event.clientY, event.target);
+      if (!started) return;
+      activeMoveTouchId = event.pointerId;
+      if (typeof stage.setPointerCapture === "function") {
+        stage.setPointerCapture(event.pointerId);
+      }
+      event.preventDefault();
     };
 
-    window.addEventListener("pointerup", stopTouchMoveControls, { passive: true });
-    window.addEventListener("pointercancel", stopTouchMoveControls, { passive: true });
-    window.addEventListener("touchend", stopTouchMoveControls, { passive: true });
-    window.addEventListener("touchcancel", stopTouchMoveControls, { passive: true });
+    const handleStagePointerMove = (event) => {
+      if (!canUseTouchControls() || event.pointerType === "mouse") return;
+      if (activeMoveTouchId !== event.pointerId) return;
+      if (!updateTouchMoveDirectionFromPoint(event.clientX, event.clientY, event.target)) {
+        releaseMove();
+      }
+      event.preventDefault();
+    };
+
+    const handleStagePointerEnd = (event) => {
+      if (activeMoveTouchId !== event.pointerId) return;
+      if (typeof stage.releasePointerCapture === "function" && stage.hasPointerCapture?.(event.pointerId)) {
+        stage.releasePointerCapture(event.pointerId);
+      }
+      releaseMove();
+      event.preventDefault();
+    };
+
+    const findTrackedTouch = (touchList) => {
+      if (activeMoveTouchId === null) return null;
+      for (const touch of touchList) {
+        if (touch.identifier === activeMoveTouchId) return touch;
+      }
+      return null;
+    };
+
+    const handleStageTouchStart = (event) => {
+      if (!canUseTouchControls() || activeMoveTouchId !== null) return;
+      for (const touch of event.changedTouches) {
+        if (updateTouchMoveDirectionFromPoint(touch.clientX, touch.clientY, event.target)) {
+          activeMoveTouchId = touch.identifier;
+          event.preventDefault();
+          break;
+        }
+      }
+    };
+
+    const handleStageTouchMove = (event) => {
+      if (!canUseTouchControls()) return;
+      const trackedTouch = findTrackedTouch(event.touches);
+      if (!trackedTouch) return;
+      if (!updateTouchMoveDirectionFromPoint(trackedTouch.clientX, trackedTouch.clientY, document.elementFromPoint(trackedTouch.clientX, trackedTouch.clientY))) {
+        releaseMove();
+      }
+      event.preventDefault();
+    };
+
+    const handleStageTouchEnd = (event) => {
+      const trackedTouch = findTrackedTouch(event.changedTouches);
+      if (!trackedTouch) return;
+      releaseMove();
+      event.preventDefault();
+    };
+
+    stage.addEventListener("pointerdown", handleStagePointerStart, { passive: false });
+    stage.addEventListener("pointermove", handleStagePointerMove, { passive: false });
+    stage.addEventListener("pointerup", handleStagePointerEnd, { passive: false });
+    stage.addEventListener("pointercancel", handleStagePointerEnd, { passive: false });
+    stage.addEventListener("touchstart", handleStageTouchStart, { passive: false });
+    stage.addEventListener("touchmove", handleStageTouchMove, { passive: false });
+    stage.addEventListener("touchend", handleStageTouchEnd, { passive: false });
+    stage.addEventListener("touchcancel", handleStageTouchEnd, { passive: false });
+
+    window.addEventListener("pointerup", handleStagePointerEnd, { passive: false });
+    window.addEventListener("pointercancel", handleStagePointerEnd, { passive: false });
+    window.addEventListener("touchend", handleStageTouchEnd, { passive: false });
+    window.addEventListener("touchcancel", handleStageTouchEnd, { passive: false });
     window.addEventListener("blur", releaseMove);
 
     pauseBtn.onclick = togglePause;
@@ -3801,7 +3744,7 @@
 
     document.addEventListener("touchmove", (event) => {
       if (!isMobileDevice()) return;
-      if (event.target.closest("#stage") || event.target.closest("#pauseBtn") || event.target.closest("#mobileControls") || event.target.closest("#ultimateBtn")) return;
+      if (event.target.closest("#stage") || event.target.closest("#pauseBtn") || event.target.closest("#ultimateBtn")) return;
       event.preventDefault();
     }, { passive: false });
 
