@@ -50,7 +50,7 @@
       right: 68px;
       z-index: 1000;
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 6px;
       pointer-events: none;
     }
@@ -113,6 +113,88 @@
       border: none;
       background: rgba(0,0,0,0.5);
       color: white;
+    }
+
+    /* Botón de ulti fijo a la derecha y barra visible en desktop + móvil. */
+    .ultimate-ui {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 1040;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .ultimate-bar {
+      width: 20px;
+      height: clamp(120px, 24vh, 180px);
+      border-radius: 999px;
+      padding: 3px;
+      background: rgba(15, 23, 42, 0.82);
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+
+    .ultimate-bar-fill {
+      width: 100%;
+      height: 0%;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #fde68a 0%, #f59e0b 52%, #ef4444 100%);
+      box-shadow: 0 0 14px rgba(251, 191, 36, 0.48);
+      transition: height 140ms ease, box-shadow 160ms ease;
+      margin-top: auto;
+    }
+
+    .ultimate-text {
+      min-width: 78px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      background: rgba(2, 6, 23, 0.76);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #f8fafc;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-align: center;
+      text-transform: uppercase;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+    }
+
+    #ultimateBtn {
+      pointer-events: auto;
+      width: clamp(72px, 13vw, 92px);
+      min-height: clamp(72px, 13vw, 92px);
+      border-radius: 999px;
+      border: 2px solid rgba(255, 255, 255, 0.28);
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.34), rgba(14, 116, 144, 0.92));
+      color: #e0f2fe;
+      font-size: clamp(15px, 2.1vw, 18px);
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      box-shadow: 0 10px 26px rgba(0,0,0,0.32);
+      opacity: 0.58;
+      transition: transform 120ms ease, opacity 120ms ease, box-shadow 140ms ease, border-color 140ms ease;
+    }
+
+    #ultimateBtn.ready {
+      opacity: 1;
+      color: #fff7ed;
+      border-color: rgba(254, 240, 138, 0.92);
+      background: radial-gradient(circle at 30% 30%, #fff7ed 0%, #facc15 28%, #f59e0b 62%, #b91c1c 100%);
+      box-shadow: 0 0 18px rgba(250, 204, 21, 0.68), 0 0 34px rgba(239, 68, 68, 0.32);
+      animation: ultimatePulse 1.15s ease-in-out infinite;
+    }
+
+    #ultimateBtn:disabled {
+      cursor: default;
+    }
+
+    #ultimateBtn:active:not(:disabled) {
+      transform: scale(0.95);
     }
 
     .mobile-lives {
@@ -611,6 +693,11 @@
       }
     }
 
+    @keyframes ultimatePulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
     @media (max-width: 768px) {
       body.mobile-ui {
         padding: 0;
@@ -642,6 +729,22 @@
         padding: 7px 10px;
         border-radius: 999px;
         background: rgba(2, 6, 23, 0.58);
+      }
+
+      body.mobile-ui .ultimate-ui {
+        right: 8px;
+        top: 54%;
+      }
+
+      body.mobile-ui .ultimate-bar {
+        width: 22px;
+        height: 132px;
+      }
+
+      body.mobile-ui #ultimateBtn {
+        width: 84px;
+        min-height: 84px;
+        font-size: 16px;
       }
 
       body.mobile-ui .help {
@@ -756,8 +859,19 @@
             <span class="label">Próx. mejora</span>
             <span class="value" id="nextUpgrade">25</span>
           </div>
+          <div class="card">
+            <span class="label">Ulti</span>
+            <span class="value" id="ultimateHud">0/25</span>
+          </div>
         </div>
         <button id="pauseBtn" type="button" aria-label="Pausar juego">⏸</button>
+        <div class="ultimate-ui" aria-label="Carga de ulti">
+          <div class="ultimate-bar" aria-hidden="true">
+            <div class="ultimate-bar-fill" id="ultimateBarFill"></div>
+          </div>
+          <div class="ultimate-text" id="ultimateText">ULTI 0/25</div>
+          <button id="ultimateBtn" type="button" aria-label="Activar ulti" disabled>ULTI</button>
+        </div>
 
         <div class="overlay show" id="overlay">
           <div class="panel start-panel">
@@ -822,6 +936,9 @@
     const nextUpgradeEl = document.getElementById("nextUpgrade");
     const nextBossEl = document.getElementById("nextBoss");
     const timeEl = document.getElementById("time");
+    const ultimateHudEl = document.getElementById("ultimateHud");
+    const ultimateBarFillEl = document.getElementById("ultimateBarFill");
+    const ultimateTextEl = document.getElementById("ultimateText");
     const mobileLivesValueEl = document.getElementById("mobileLivesValue");
     const mobileCoinsValueEl = document.getElementById("mobileCoinsValue");
     const mobileKillsValueEl = document.getElementById("mobileKillsValue");
@@ -841,6 +958,7 @@
     const restartBtn = document.getElementById("restartBtn");
     const moveLeftBtn = document.getElementById("moveLeftBtn");
     const moveRightBtn = document.getElementById("moveRightBtn");
+    const ultimateBtn = document.getElementById("ultimateBtn");
 
     // Ajuste puntual de umbrales de mejora por monedas: nivel 4 ahora requiere 175 en vez de 190
     const UPGRADE_STEPS = [25, 75, 175, 290];
@@ -921,11 +1039,16 @@
     let normalEnemyKills = 0;
     let totalEnemyKills = 0;
     let advancedEnemiesUnlocked = false;
-    let diamondUpgradeSpawned = false;
-    let diamondMode = false;
     let postBoss3DifficultyUnlocked = false;
     let shieldActive = false;
     let shieldTimer = 0;
+    // Sistema de carga de ulti: reemplaza por completo la vieja progresión diamante.
+    const ultimateHitsRequired = 25;
+    const ultimateDuration = 60 * 7.5;
+    let ultimateHits = 0;
+    let ultimateReady = false;
+    let ultimateActive = false;
+    let ultimateTimer = 0;
     let screenShake = 0;
     let screenShakeStrength = 0;
     let flashTimer = 0;
@@ -1321,7 +1444,6 @@
 
       if (advancedEnemiesUnlocked) multiplier *= 1.1;
       if (postBoss3DifficultyUnlocked) multiplier *= 1.2;
-      if (diamondMode) multiplier *= 1.15;
 
       return multiplier;
     }
@@ -1341,8 +1463,15 @@
       return 1.28;
     }
 
+    // Daño temporal por nivel: la ulti lee dinámicamente el nivel actual del arma mientras dura.
     function weaponDamage(level) {
-      if (level === 6) return 12;
+      if (ultimateActive) {
+        if (level === 1) return 3;
+        if (level === 2) return 6;
+        if (level === 3) return 9;
+        if (level === 4) return 12;
+        return 20;
+      }
       return level;
     }
 
@@ -1358,6 +1487,25 @@
       return null;
     }
 
+    function updateUltimateUi() {
+      const clampedHits = clamp(ultimateHits, 0, ultimateHitsRequired);
+      const ratio = clampedHits / ultimateHitsRequired;
+      ultimateBarFillEl.style.height = `${ratio * 100}%`;
+      ultimateBtn.disabled = !ultimateReady || ultimateActive || !running || isPaused;
+      ultimateBtn.classList.toggle("ready", ultimateReady && !ultimateActive);
+      ultimateBtn.textContent = ultimateActive ? "ON" : "ULTI";
+      ultimateHudEl.textContent = ultimateActive
+        ? `ACTIVA ${Math.max(0, (ultimateTimer / 60)).toFixed(1)}s`
+        : ultimateReady
+          ? "LISTA"
+          : `${clampedHits}/${ultimateHitsRequired}`;
+      ultimateTextEl.textContent = ultimateActive
+        ? `ACTIVA ${Math.max(0, (ultimateTimer / 60)).toFixed(1)}s`
+        : ultimateReady
+          ? "ULTI LISTA"
+          : `ULTI ${clampedHits}/${ultimateHitsRequired}`;
+    }
+
     function updateHud() {
       coinsEl.textContent = coins;
       bestEl.textContent = bestCoins;
@@ -1365,12 +1513,13 @@
       mobileLivesValueEl.textContent = lives;
       mobileCoinsValueEl.textContent = coins;
       mobileKillsValueEl.textContent = totalEnemyKills;
-      weaponEl.textContent = diamondMode ? "◆" : weaponLevel;
+      weaponEl.textContent = weaponLevel;
       nextUpgradeEl.textContent = nextUpgradeTarget();
       timeEl.textContent = `${elapsedSeconds}s`;
 
       const nextBoss = nextBossTarget();
       nextBossEl.textContent = nextBoss !== null ? `${nextBoss}s` : "FIN";
+      updateUltimateUi();
     }
 
     function createStars(count) {
@@ -1490,19 +1639,6 @@
       });
     }
 
-    function spawnDiamondUpgrade(x, y) {
-      weaponDrops.push({
-        x: clamp(x, 0, canvas.width - 32),
-        y: Math.max(32, y),
-        w: 32,
-        h: 32,
-        dx: (Math.random() < 0.5 ? -1 : 1) * 1.5,
-        dy: 1.05,
-        sway: Math.random() * Math.PI * 2,
-        kind: "diamond"
-      });
-    }
-
     function maybeSpawnRewardDrop(x, y) {
       if (normalEnemyKills > 0 && normalEnemyKills % 30 === 0) {
         spawnLifeDrop(x, y);
@@ -1522,11 +1658,7 @@
       totalEnemyKills++;
       maybeSpawnRewardDrop(x - 14, y - 14);
 
-      // Ajuste puntual de mejora diamante: ahora se desbloquea a las 155 kills
-      if (totalEnemyKills >= 155 && !diamondUpgradeSpawned) {
-        diamondUpgradeSpawned = true;
-        spawnDiamondUpgrade(x - 16, y - 16);
-      }
+      // Eliminación/reemplazo del sistema diamante: las kills ya no desbloquean una mejora permanente.
     }
 
     function activateShield() {
@@ -1534,8 +1666,35 @@
       shieldTimer = 60 * 5;
     }
 
+    function registerUltimateHit() {
+      if (ultimateActive || ultimateReady) return;
+      ultimateHits = Math.min(ultimateHitsRequired, ultimateHits + 1);
+      if (ultimateHits >= ultimateHitsRequired) {
+        ultimateHits = ultimateHitsRequired;
+        ultimateReady = true;
+      }
+    }
+
+    function activateUltimate() {
+      if (!ultimateReady || ultimateActive || !running || isPaused) return;
+      ultimateActive = true;
+      ultimateReady = false;
+      ultimateHits = 0;
+      ultimateTimer = ultimateDuration;
+      updateHud();
+    }
+
+    function updateUltimateState() {
+      if (!ultimateActive) return;
+      ultimateTimer--;
+      if (ultimateTimer <= 0) {
+        ultimateActive = false;
+        ultimateTimer = 0;
+      }
+    }
+
     function applyPlayerDamage(amount, cooldown, explosionColor, shake, flash) {
-      if (shieldActive) return false;
+      if (shieldActive || ultimateActive) return false;
 
       createExplosion(player.x + player.w / 2, player.y + player.h / 2, 12, explosionColor);
       lives -= amount;
@@ -1586,11 +1745,13 @@
       normalEnemyKills = 0;
       totalEnemyKills = 0;
       advancedEnemiesUnlocked = false;
-      diamondUpgradeSpawned = false;
-      diamondMode = false;
       postBoss3DifficultyUnlocked = false;
       shieldActive = false;
       shieldTimer = 0;
+      ultimateHits = 0;
+      ultimateReady = false;
+      ultimateActive = false;
+      ultimateTimer = 0;
       screenShake = 0;
       screenShakeStrength = 0;
       flashTimer = 0;
@@ -1700,7 +1861,7 @@
       updatePauseButton();
       overlayTitle.textContent = "PURIS VS LAS MAQUINAS";
       overlayTitle.removeAttribute("aria-label");
-      overlayText.textContent = `Monedas: ${coins} | Tiempo: ${elapsedSeconds}s | Arma final: ${diamondMode ? "Diamante" : weaponLevel}`;
+      overlayText.textContent = `Monedas: ${coins} | Tiempo: ${elapsedSeconds}s | Arma final: ${weaponLevel}`;
       overlayExtra.hidden = !finalVictoryAchieved;
       overlayExtra.innerHTML = finalVictoryAchieved
         ? 'Desarrollado por <strong>"Tu padre"</strong> para <strong>"Su preferido"</strong> ❤️ Te amo'
@@ -1958,7 +2119,7 @@
 
     function handleStageTouchStart(e) {
       if (activeTouchId !== null) return;
-      if (!canUseTouchControls() || e.target.closest("#pauseBtn")) return;
+      if (!canUseTouchControls() || e.target.closest("#pauseBtn") || e.target.closest("#ultimateBtn")) return;
       const touch = e.changedTouches[0];
       if (!touch) return;
       activeTouchId = touch.identifier;
@@ -2161,11 +2322,6 @@
       if (weaponLevel === 5) {
         bullets.push({ x: centerX - 12, y: 0, w: 24, h: player.y + 10, speed: 0, damage: dmg, type: "laser-gold", color: "#facc15", life: 2 });
       }
-
-      if (weaponLevel === 6) {
-        bullets.push({ x: centerX - 18, y: 0, w: 12, h: player.y + 12, speed: 0, damage: dmg, type: "laser-diamond", color: "#facc15", life: 2 });
-        bullets.push({ x: centerX + 6, y: 0, w: 12, h: player.y + 12, speed: 0, damage: dmg, type: "laser-diamond", color: "#e0f2fe", life: 2 });
-      }
     }
 
     function updateBossIntro() {
@@ -2193,7 +2349,7 @@
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
 
-        if (b.type === "laser-red" || b.type === "laser-gold" || b.type === "laser-diamond") {
+        if (b.type === "laser-red" || b.type === "laser-gold") {
           b.life--;
           if (b.life <= 0) bullets.splice(i, 1);
           continue;
@@ -2294,8 +2450,8 @@
     function updateWeaponDrops() {
       for (let i = weaponDrops.length - 1; i >= 0; i--) {
         const w = weaponDrops[i];
-        w.sway = (w.sway || 0) + (w.kind === "diamond" ? 0.12 : 0.08);
-        w.x += w.dx + Math.sin(w.sway) * (w.kind === "diamond" ? 0.45 : 0);
+        w.sway = (w.sway || 0) + 0.08;
+        w.x += w.dx;
         w.y += w.dy;
 
         if (w.x <= 0) {
@@ -2463,7 +2619,9 @@
             e.hp -= b.damage;
             playHitSound("enemy");
 
-            if (b.type !== "laser-red" && b.type !== "laser-gold" && b.type !== "laser-diamond") {
+            registerUltimateHit();
+
+            if (b.type !== "laser-red" && b.type !== "laser-gold") {
               bullets.splice(i, 1);
               removeBullet = true;
             }
@@ -2491,7 +2649,9 @@
           boss.hp -= b.damage;
           playHitSound("boss");
 
-          if (b.type !== "laser-red" && b.type !== "laser-gold" && b.type !== "laser-diamond") {
+          registerUltimateHit();
+
+          if (b.type !== "laser-red" && b.type !== "laser-gold") {
             bullets.splice(i, 1);
           }
 
@@ -2597,14 +2757,6 @@
           const drop = weaponDrops[i];
           weaponDrops.splice(i, 1);
 
-          if (drop.kind === "diamond") {
-            diamondMode = true;
-            weaponLevel = 6;
-            continue;
-          }
-
-          if (diamondMode) continue;
-
           const maxAvailable = maxWeaponLevelAvailableByCoins();
           if (weaponLevel < maxAvailable) weaponLevel++;
         }
@@ -2628,9 +2780,7 @@
     function updateDifficulty() {
       const stage = Math.floor(elapsedSeconds / 18);
       const baseSpawnRate = 54 - stage * 2;
-      const speedMultiplier = diamondMode ? 1.1 : 1;
-
-      enemyBaseSpeed = (1.65 + stage * 0.08 + (advancedEnemiesUnlocked ? 0.08 : 0)) * speedMultiplier;
+      enemyBaseSpeed = 1.65 + stage * 0.08 + (advancedEnemiesUnlocked ? 0.08 : 0);
       enemySpawnRate = Math.max(12, Math.round(baseSpawnRate / spawnPressureMultiplier()));
       autoFireRate = Math.max(8, 13 - Math.floor(stage / 4));
 
@@ -2672,6 +2822,7 @@
       updatePlayer();
       updateBossIntro();
       updateShieldState();
+      updateUltimateState();
       updateScreenEffects();
 
       if (frame % autoFireRate === 0) {
@@ -2847,58 +2998,73 @@
         ctx.fillRect(x + player.w / 2 - 2, y - 18, 4, 10);
       }
 
-      if (weaponLevel === 6) {
-        const bodyGradient = ctx.createLinearGradient(x, y, x + player.w, y + player.h);
-        bodyGradient.addColorStop(0, "#fff7ed");
-        bodyGradient.addColorStop(0.4, "#facc15");
-        bodyGradient.addColorStop(0.75, "#f59e0b");
-        bodyGradient.addColorStop(1, "#e0f2fe");
+      // Transformación visual de las 5 naves: cada ulti reutiliza la estética existente y la escala por nivel.
+      if (ultimateActive) {
+        const aura = 0.55 + Math.sin(frame * 0.18) * 0.18;
+        const wingInset = Math.max(6, 16 - weaponLevel * 2);
+        const noseLift = 6 + weaponLevel * 2;
+        const bodyGradient = ctx.createLinearGradient(x - 6, y - 10, x + player.w + 6, y + player.h + 6);
+        bodyGradient.addColorStop(0, weaponLevel >= 4 ? "#fff7ed" : "#dcfce7");
+        bodyGradient.addColorStop(0.35, weaponLevel >= 3 ? "#facc15" : "#38bdf8");
+        bodyGradient.addColorStop(0.7, weaponLevel >= 4 ? "#f97316" : "#22c55e");
+        bodyGradient.addColorStop(1, weaponLevel === 5 ? "#e0f2fe" : "#1d4ed8");
+        ctx.shadowColor = weaponLevel >= 4 ? `rgba(250, 204, 21, ${aura})` : `rgba(56, 189, 248, ${aura})`;
+        ctx.shadowBlur = 18 + weaponLevel * 2;
         ctx.fillStyle = bodyGradient;
         ctx.beginPath();
-        ctx.moveTo(x + player.w / 2, y - 10);
-        ctx.lineTo(x + player.w + 6, y + 10);
-        ctx.lineTo(x + player.w + 2, y + player.h - 6);
-        ctx.lineTo(x + player.w / 2, y + player.h + 4);
-        ctx.lineTo(x - 2, y + player.h - 6);
-        ctx.lineTo(x - 6, y + 10);
+        ctx.moveTo(x + player.w / 2, y - noseLift);
+        ctx.lineTo(x + player.w + 8 + weaponLevel, y + 10);
+        ctx.lineTo(x + player.w + 2, y + player.h - wingInset);
+        ctx.lineTo(x + player.w / 2, y + player.h + 6 + Math.min(weaponLevel, 3));
+        ctx.lineTo(x - 2, y + player.h - wingInset);
+        ctx.lineTo(x - 8 - weaponLevel, y + 10);
         ctx.closePath();
         ctx.fill();
 
-        ctx.fillStyle = "#fef3c7";
+        ctx.fillStyle = weaponLevel >= 4 ? "rgba(255, 247, 237, 0.92)" : "rgba(224, 242, 254, 0.9)";
         ctx.beginPath();
-        ctx.moveTo(x + player.w / 2, y - 2);
-        ctx.lineTo(x + player.w - 10, y + 18);
-        ctx.lineTo(x + player.w / 2, y + player.h - 8);
-        ctx.lineTo(x + 10, y + 18);
+        ctx.moveTo(x + player.w / 2, y + 2);
+        ctx.lineTo(x + player.w - wingInset, y + 18);
+        ctx.lineTo(x + player.w / 2, y + player.h - 6);
+        ctx.lineTo(x + wingInset, y + 18);
         ctx.closePath();
         ctx.fill();
 
-        ctx.fillStyle = "#bae6fd";
-        ctx.fillRect(x - 12, y + 16, 18, 24);
-        ctx.fillRect(x + player.w - 6, y + 16, 18, 24);
-
-        ctx.fillStyle = "#a16207";
-        ctx.fillRect(x + 12, y + 16, 32, 18);
-
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = weaponLevel >= 3 ? "#0f172a" : "#14532d";
+        ctx.fillRect(x + 10, y + 14, player.w - 20, 22);
+        ctx.fillStyle = weaponLevel >= 4 ? "#fde68a" : "#93c5fd";
         ctx.beginPath();
-        ctx.moveTo(x + player.w / 2, y + 6);
-        ctx.lineTo(x + player.w / 2 + 8, y + 20);
-        ctx.lineTo(x + player.w / 2, y + 34);
-        ctx.lineTo(x + player.w / 2 - 8, y + 20);
-        ctx.closePath();
+        ctx.arc(x + player.w / 2, y + 22, 8 + weaponLevel * 0.7, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = "#facc15";
-        ctx.fillRect(x + 8, y - 16, 8, 28);
-        ctx.fillRect(x + player.w - 16, y - 16, 8, 28);
+        ctx.fillStyle = weaponLevel >= 4 ? "#facc15" : "#38bdf8";
+        ctx.fillRect(x - 10 - weaponLevel, y + 18, 14 + weaponLevel * 2, 20 + weaponLevel);
+        ctx.fillRect(x + player.w - 4, y + 18, 14 + weaponLevel * 2, 20 + weaponLevel);
 
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x + 3, y + 3, player.w - 6, player.h - 6);
-
-        ctx.shadowColor = "rgba(250, 204, 21, 0.7)";
-        ctx.shadowBlur = 18;
+        if (weaponLevel >= 2) {
+          ctx.fillRect(x + player.w / 2 - 4, y - 12 - weaponLevel, 8, 18 + weaponLevel * 2);
+        }
+        if (weaponLevel >= 3) {
+          ctx.fillStyle = "#f97316";
+          ctx.fillRect(x + 6, y + player.h - 4, 8, 14);
+          ctx.fillRect(x + player.w - 14, y + player.h - 4, 8, 14);
+          ctx.fillRect(x + player.w / 2 - 4, y + player.h - 2, 8, 16);
+        }
+        if (weaponLevel >= 4) {
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x + 4, y + 4, player.w - 8, player.h - 8);
+        }
+        if (weaponLevel === 5) {
+          ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+          ctx.beginPath();
+          ctx.moveTo(x + player.w / 2, y - 6);
+          ctx.lineTo(x + player.w / 2 + 9, y + 18);
+          ctx.lineTo(x + player.w / 2, y + 36);
+          ctx.lineTo(x + player.w / 2 - 9, y + 18);
+          ctx.closePath();
+          ctx.fill();
+        }
       }
 
       ctx.fillStyle = "#f59e0b";
@@ -2916,15 +3082,15 @@
       ctx.closePath();
       ctx.fill();
 
-      if (shieldActive) {
+      if (shieldActive || ultimateActive) {
         const pulse = 2 + Math.sin(frame * 0.18) * 1.5;
-        ctx.strokeStyle = "rgba(125, 211, 252, 0.9)";
+        ctx.strokeStyle = ultimateActive ? "rgba(250, 204, 21, 0.95)" : "rgba(125, 211, 252, 0.9)";
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.arc(x + player.w / 2, y + player.h / 2, player.w * 0.48 + pulse, 0, Math.PI * 2);
         ctx.stroke();
 
-        ctx.strokeStyle = "rgba(224, 242, 254, 0.45)";
+        ctx.strokeStyle = ultimateActive ? "rgba(255, 255, 255, 0.52)" : "rgba(224, 242, 254, 0.45)";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.arc(x + player.w / 2, y + player.h / 2, player.w * 0.38 + pulse * 0.5, 0, Math.PI * 2);
@@ -2936,19 +3102,13 @@
 
     function drawBullets() {
       for (const b of bullets) {
-        if (b.type === "laser-red" || b.type === "laser-gold" || b.type === "laser-diamond") {
+        if (b.type === "laser-red" || b.type === "laser-gold") {
           ctx.save();
-          ctx.globalAlpha = b.type === "laser-diamond" ? 0.82 : 0.65;
+          ctx.globalAlpha = 0.7;
           ctx.fillStyle = b.color;
-          if (b.type === "laser-red" || b.type === "laser-gold") {
-            ctx.shadowColor = b.color;
-            ctx.shadowBlur = 10;
-          }
+          ctx.shadowColor = b.color;
+          ctx.shadowBlur = 10;
           ctx.fillRect(b.x, b.y, b.w, b.h);
-          if (b.type === "laser-diamond") {
-            ctx.fillStyle = "rgba(255,255,255,0.55)";
-            ctx.fillRect(b.x + 3, b.y, Math.max(2, b.w - 6), b.h);
-          }
           ctx.restore();
         } else {
           ctx.fillStyle = b.color;
@@ -3087,36 +3247,6 @@
 
     function drawWeaponDrops() {
       for (const w of weaponDrops) {
-        if (w.kind === "diamond") {
-          const glow = 0.45 + Math.sin((frame + w.y) * 0.16) * 0.18;
-          ctx.save();
-          ctx.shadowColor = `rgba(250, 204, 21, ${Math.max(0.25, glow)})`;
-          ctx.shadowBlur = 18;
-          ctx.fillStyle = "#facc15";
-          ctx.beginPath();
-          ctx.moveTo(w.x + w.w / 2, w.y);
-          ctx.lineTo(w.x + w.w, w.y + w.h / 2);
-          ctx.lineTo(w.x + w.w / 2, w.y + w.h);
-          ctx.lineTo(w.x, w.y + w.h / 2);
-          ctx.closePath();
-          ctx.fill();
-
-          ctx.fillStyle = "#ffffff";
-          ctx.beginPath();
-          ctx.moveTo(w.x + w.w / 2, w.y + 5);
-          ctx.lineTo(w.x + w.w - 6, w.y + w.h / 2);
-          ctx.lineTo(w.x + w.w / 2, w.y + w.h - 5);
-          ctx.lineTo(w.x + 6, w.y + w.h / 2);
-          ctx.closePath();
-          ctx.fill();
-
-          ctx.strokeStyle = "#fff7ed";
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          ctx.restore();
-          continue;
-        }
-
         ctx.fillStyle = "#a855f7";
         ctx.fillRect(w.x, w.y, w.w, w.h);
 
@@ -3406,6 +3536,7 @@
       }
 
       updatePauseButton();
+      updateHud();
     }
 
     function handleOverlayPrimaryAction() {
@@ -3458,6 +3589,16 @@
 
     pauseBtn.onclick = togglePause;
 
+    // Botón de ulti: soporta click/touch y evita doble activación accidental al deshabilitarse al instante.
+    ultimateBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      activateUltimate();
+    });
+    ultimateBtn.addEventListener("touchstart", (event) => {
+      event.preventDefault();
+      activateUltimate();
+    }, { passive: false });
+
     [MOBILE_BREAKPOINT, COARSE_POINTER, NO_HOVER_POINTER, PORTRAIT_ORIENTATION].forEach((mediaQuery) => {
       const handleChange = () => resizeCanvas();
       if (typeof mediaQuery.addEventListener === "function") {
@@ -3496,7 +3637,7 @@
 
     document.addEventListener("touchmove", (event) => {
       if (!isMobileDevice()) return;
-      if (event.target.closest("#stage") || event.target.closest("#pauseBtn") || event.target.closest("#mobileControls")) return;
+      if (event.target.closest("#stage") || event.target.closest("#pauseBtn") || event.target.closest("#mobileControls") || event.target.closest("#ultimateBtn")) return;
       event.preventDefault();
     }, { passive: false });
 
