@@ -1043,8 +1043,7 @@
     let shieldActive = false;
     let shieldTimer = 0;
     // Sistema de carga de ulti: reemplaza por completo la vieja progresión diamante.
-    // Cambio puntual: el requisito de carga de la ulti ahora es de 40 impactos efectivos a bosses.
-    const ultimateHitsRequired = 40;
+    // Requisito dinámico por nivel: la ulti pide distintos impactos reales al boss según el arma actual.
     const ultimateDuration = 60 * 7.5;
     let ultimateHits = 0;
     let ultimateReady = false;
@@ -1466,6 +1465,20 @@
       return 1.28;
     }
 
+    function getUltimateHitsRequiredByWeaponLevel(level) {
+      if (level === 2) return 60;
+      if (level === 3) return 90;
+      return 40;
+    }
+
+    function getCurrentUltimateHitsRequired() {
+      return getUltimateHitsRequiredByWeaponLevel(weaponLevel);
+    }
+
+    function syncUltimateReadyState() {
+      ultimateReady = !ultimateActive && ultimateHits >= getCurrentUltimateHitsRequired();
+    }
+
     // Daño temporal por nivel: la ulti lee dinámicamente el nivel actual del arma mientras dura.
     function weaponDamage(level) {
       if (ultimateActive) {
@@ -1491,8 +1504,11 @@
     }
 
     function updateUltimateUi() {
-      const clampedHits = clamp(ultimateHits, 0, ultimateHitsRequired);
-      const ratio = clampedHits / ultimateHitsRequired;
+      // UI con máximo dinámico: la barra/texto se recalculan con el requisito del nivel de arma actual.
+      const currentUltimateHitsRequired = getCurrentUltimateHitsRequired();
+      syncUltimateReadyState();
+      const clampedHits = clamp(ultimateHits, 0, currentUltimateHitsRequired);
+      const ratio = clampedHits / currentUltimateHitsRequired;
       ultimateBarFillEl.style.height = `${ratio * 100}%`;
       ultimateBtn.disabled = !ultimateReady || ultimateActive || !running || isPaused;
       ultimateBtn.classList.toggle("ready", ultimateReady && !ultimateActive);
@@ -1501,12 +1517,12 @@
         ? `ACTIVA ${Math.max(0, (ultimateTimer / 60)).toFixed(1)}s`
         : ultimateReady
           ? "LISTA"
-          : `${clampedHits}/${ultimateHitsRequired}`;
+          : `${clampedHits}/${currentUltimateHitsRequired}`;
       ultimateTextEl.textContent = ultimateActive
         ? `ACTIVA ${Math.max(0, (ultimateTimer / 60)).toFixed(1)}s`
         : ultimateReady
           ? "ULTI LISTA"
-          : `ULTI ${clampedHits}/${ultimateHitsRequired}`;
+          : `ULTI ${clampedHits}/${currentUltimateHitsRequired}`;
     }
 
     function updateHud() {
@@ -1671,16 +1687,17 @@
     }
 
     function registerUltimateHit(targetType) {
-      // Cambio puntual: solo se cuentan impactos reales contra bosses para cargar la ulti.
-      if (targetType !== "boss" || ultimateActive || ultimateReady) return;
-      ultimateHits = Math.min(ultimateHitsRequired, ultimateHits + 1);
-      if (ultimateHits >= ultimateHitsRequired) {
-        ultimateHits = ultimateHitsRequired;
-        ultimateReady = true;
-      }
+      // Solo impactos reales a bosses: enemigos normales siguen sin cargar la ulti.
+      if (targetType !== "boss" || ultimateActive) return;
+      const currentUltimateHitsRequired = getCurrentUltimateHitsRequired();
+      syncUltimateReadyState();
+      if (ultimateHits >= currentUltimateHitsRequired) return;
+      ultimateHits = Math.min(ultimateHits + 1, currentUltimateHitsRequired);
+      syncUltimateReadyState();
     }
 
     function activateUltimate() {
+      syncUltimateReadyState();
       if (!ultimateReady || ultimateActive || !running || isPaused) return;
       ultimateActive = true;
       ultimateReady = false;
