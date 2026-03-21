@@ -36,10 +36,17 @@
     }
 
     body.mobile-ui.game-active,
+    body.mobile-ui.game-active #appRoot,
+    body.mobile-ui.game-active #canvasBox,
+    body.mobile-ui.game-active #stage,
+    body.mobile-ui.game-active canvas,
     body.mobile-ui.game-active .canvas-box,
-    body.mobile-ui.game-active .stage,
-    body.mobile-ui.game-active canvas {
+    body.mobile-ui.game-active .stage {
       touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .wrap {
@@ -1064,12 +1071,16 @@
       );
     }
 
+    function isMobileDevice() {
+      return isTouchDevice();
+    }
+
     function shouldBlockPortraitMobile() {
-      return isTouchDevice() && PORTRAIT_ORIENTATION.matches;
+      return isMobileDevice() && PORTRAIT_ORIENTATION.matches;
     }
 
     function isLandscapeMobile() {
-      return isTouchDevice() && !PORTRAIT_ORIENTATION.matches;
+      return isMobileDevice() && !PORTRAIT_ORIENTATION.matches;
     }
 
     function logTouchDebugState(context = "state") {
@@ -3812,6 +3823,17 @@
         resizeCanvas();
       });
     }
+
+    // Callout/contextmenu/selectstart bloqueados acá: durante gameplay táctil evitan copiar/pegar y selección por long-press.
+    window.addEventListener("contextmenu", (event) => {
+      if (!canUseTouchControls()) return;
+      event.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener("selectstart", (event) => {
+      if (!canUseTouchControls()) return;
+      event.preventDefault();
+    }, { passive: false });
 
     document.addEventListener("touchmove", (event) => {
       if (!isTouchDevice()) return;
