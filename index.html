@@ -697,6 +697,7 @@
             <div class="btns">
               <button class="btn-primary start-btn" id="startBtn">JUGAR</button>
               <button class="btn-secondary" id="restartBtn" hidden>Reiniciar</button>
+              <button class="btn-secondary" id="pauseRestartBtn" hidden>Reiniciar partida</button>
             </div>
           </div>
         </div>
@@ -757,6 +758,7 @@
     const overlayText = document.getElementById("overlayText");
     const overlayExtra = document.getElementById("overlayExtra");
     const startBtn = document.getElementById("startBtn");
+    const pauseRestartBtn = document.getElementById("pauseRestartBtn");
     const orientationOverlay = document.getElementById("orientationOverlay");
     const celebrationOverlay = document.getElementById("celebrationOverlay");
     const celebrationCanvas = document.getElementById("celebrationCanvas");
@@ -841,6 +843,7 @@
     let celebrationTimeoutId = null;
     let celebrationParticles = [];
     let waitingForFinalCelebrationAdvance = false;
+    let isProcessingPauseRestart = false;
     let finalVictoryAchieved = false;
     let normalEnemyKills = 0;
     let totalEnemyKills = 0;
@@ -1559,6 +1562,7 @@
     function showStartScreen() {
       running = false;
       isPaused = false;
+      overlay.dataset.mode = "start";
       overlayTitle.textContent = "LA BATALLA DEL PURIS";
       overlayTitle.dataset.title = "LA BATALLA DEL PURIS";
       overlayText.innerHTML = "Entrá en combate cuando estés listo.<br>Al tocar <strong>JUGAR</strong> se intentará abrir el juego en fullscreen para aprovechar mejor la pantalla del celular.";
@@ -1566,24 +1570,52 @@
       overlayExtra.textContent = "";
       startBtn.textContent = "JUGAR";
       restartBtn.hidden = true;
+      pauseRestartBtn.hidden = true;
       overlay.classList.add("show", "start-screen");
       syncGameUiState();
     }
 
     function startGame() {
+      isProcessingPauseRestart = false;
       resetGame();
       running = true;
+      overlay.dataset.mode = "playing";
       overlay.classList.remove("show", "start-screen");
       restartBtn.hidden = false;
+      pauseRestartBtn.hidden = true;
       syncGameUiState();
       syncOrientationOverlay();
       loop();
+    }
+
+    function showPauseOverlay() {
+      overlay.dataset.mode = "pause";
+      overlayTitle.textContent = "PAUSA";
+      overlayTitle.dataset.title = "PAUSA";
+      overlayText.textContent = "La partida está en pausa.";
+      overlayExtra.hidden = true;
+      overlayExtra.textContent = "";
+      startBtn.textContent = "Reanudar";
+      restartBtn.hidden = true;
+      pauseRestartBtn.hidden = false;
+      overlay.classList.add("show");
+      overlay.classList.remove("start-screen");
+      syncGameUiState();
+    }
+
+    // Lógica agregada: reiniciar partida desde el menú de pausa sin recargar la página.
+    function restartGameFromPause() {
+      if (!running || !isPaused || isProcessingPauseRestart) return;
+      isProcessingPauseRestart = true;
+      releaseMove();
+      startGame();
     }
 
     function showFinalResultOverlay() {
       hideFinalBossCelebration();
       running = false;
       isPaused = false;
+      overlay.dataset.mode = "result";
       cancelAnimationFrame(animationId);
 
       if (coins > bestCoins) {
@@ -1602,6 +1634,7 @@
         : "";
       startBtn.textContent = "Jugar de nuevo";
       restartBtn.hidden = false;
+      pauseRestartBtn.hidden = true;
       overlay.classList.add("show");
       overlay.classList.remove("start-screen");
       syncGameUiState();
@@ -3289,7 +3322,26 @@
         }
       }
 
+      if (isPaused) {
+        showPauseOverlay();
+      } else {
+        overlay.dataset.mode = "playing";
+        overlay.classList.remove("show", "start-screen");
+        pauseRestartBtn.hidden = true;
+        restartBtn.hidden = false;
+        syncGameUiState();
+      }
+
       updatePauseButton();
+    }
+
+    function handleOverlayPrimaryAction() {
+      if (overlay.dataset.mode === "pause") {
+        togglePause();
+        return;
+      }
+
+      handleGameEntry();
     }
 
     function pressLeft() {
@@ -3354,8 +3406,9 @@
     celebrationOverlay.addEventListener("pointerdown", advanceFinalBossCelebration);
     celebrationOverlay.addEventListener("touchstart", advanceFinalBossCelebration, { passive: true });
     celebrationOverlay.addEventListener("click", advanceFinalBossCelebration);
-    startBtn.addEventListener("click", handleGameEntry);
+    startBtn.addEventListener("click", handleOverlayPrimaryAction);
     restartBtn.addEventListener("click", handleGameEntry);
+    pauseRestartBtn.addEventListener("click", restartGameFromPause);
 
     bindPressControl(moveLeftBtn, pressLeft);
     bindPressControl(moveRightBtn, pressRight);
