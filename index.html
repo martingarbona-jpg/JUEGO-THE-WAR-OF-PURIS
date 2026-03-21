@@ -89,6 +89,8 @@
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      background: #000;
+      --mobile-side-gutter: 0px;
       --stage-left-gap: 0px;
       --stage-right-gap: 0px;
       --mobile-control-top: 50%;
@@ -112,7 +114,7 @@
       position: absolute;
       inset: 0;
       pointer-events: none;
-      z-index: 1050;
+      z-index: 1090;
       display: none;
     }
 
@@ -838,6 +840,16 @@
     }
 
     @media (max-width: 768px) and (orientation: landscape) {
+      body.mobile-ui {
+        background: #000;
+      }
+
+      body.mobile-ui .canvas-box {
+        padding-left: clamp(86px, 12vw, 112px);
+        padding-right: clamp(86px, 12vw, 112px);
+        --mobile-side-gutter: clamp(86px, 12vw, 112px);
+      }
+
       body.mobile-ui #pauseBtn {
         top: 6px;
         right: 6px;
@@ -1183,8 +1195,9 @@
       const leftGap = Math.max(0, stageRect.left - canvasRect.left);
       const rightGap = Math.max(0, canvasRect.right - stageRect.right);
       const controlCenterY = clamp(stageRect.top - canvasRect.top + stageRect.height * 0.58, 0, canvasRect.height);
+      const gutterSize = parseFloat(getComputedStyle(canvasBox).getPropertyValue("--mobile-side-gutter")) || 0;
 
-      const hasSideMargins = leftGap >= 24 && rightGap >= 24;
+      const hasSideMargins = leftGap >= 24 && rightGap >= 24 && gutterSize >= 24;
 
       canvasBox.style.setProperty("--stage-left-gap", `${leftGap}px`);
       canvasBox.style.setProperty("--stage-right-gap", `${rightGap}px`);
@@ -1198,13 +1211,18 @@
     }
 
     function resizeCanvas() {
-      syncMobileViewportState();
+      syncGameUiState();
       syncOrientationOverlay();
       const rect = canvasBox.getBoundingClientRect();
+      const canvasBoxStyles = getComputedStyle(canvasBox);
+      // Diagnóstico corregido acá: el stage antes se escalaba con el ancho total del contenedor,
+      // así que al iniciar/fullscreeen en móvil se comía los márgenes y los botones quedaban sin espacio visible.
+      const availableWidth = rect.width - parseFloat(canvasBoxStyles.paddingLeft || 0) - parseFloat(canvasBoxStyles.paddingRight || 0);
+      const availableHeight = rect.height - parseFloat(canvasBoxStyles.paddingTop || 0) - parseFloat(canvasBoxStyles.paddingBottom || 0);
       const { width: nextWidth, height: nextHeight } = getTargetWorldSize();
       const prevWidth = canvas.width;
       const prevHeight = canvas.height;
-      const scale = Math.min(rect.width / nextWidth, rect.height / nextHeight);
+      const scale = Math.min(availableWidth / nextWidth, availableHeight / nextHeight);
       const nextStageWidth = Math.max(1, Math.round(nextWidth * scale));
       const nextStageHeight = Math.max(1, Math.round(nextHeight * scale));
 
@@ -1212,6 +1230,7 @@
 
       stage.style.width = `${nextStageWidth}px`;
       stage.style.height = `${nextStageHeight}px`;
+      updateMobileControlsLayout();
 
       if (
         nextWidth === prevWidth &&
