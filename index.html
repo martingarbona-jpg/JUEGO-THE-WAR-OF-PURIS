@@ -2600,6 +2600,7 @@
       let pattern = [];
       let speed = 1.25;
       let radius = 6;
+      const boss4Pattern = [-1.02, -0.64, -0.26, 0.26, 0.64, 1.02];
 
       if (boss.type === 1) {
         // Ajuste del comportamiento del Boss 1: pasa a 4 proyectiles y más velocidad, inspirado en el Boss 2 anterior.
@@ -2612,13 +2613,14 @@
         speed = 1.84;
         radius = 7;
       } else if (boss.type === 3) {
-        // Ajuste puntual de balance del Boss 3: menos densidad y más separación para abrir huecos reales.
-        pattern = [-0.9, -0.46, 0, 0.46, 0.9];
-        speed = 1.82;
+        // Boss 3 reemplazado: ahora reutiliza el mismo abanico base del Boss 4, pero con un proyectil menos en el centro.
+        // Nerf aplicado al Boss 3: 5 proyectiles en vez de 6 y menor velocidad para que queden huecos reales para esquivar.
+        pattern = [boss4Pattern[0], boss4Pattern[2], 0, boss4Pattern[3], boss4Pattern[5]];
+        speed = 1.88;
         radius = 7;
       } else {
         // Ajuste puntual de balance del Boss 4/final: sigue siendo el más difícil, pero con ventanas de esquive más legibles.
-        pattern = [-1.02, -0.64, -0.26, 0.26, 0.64, 1.02];
+        pattern = boss4Pattern;
         speed = 2.06;
         radius = 8;
       }
