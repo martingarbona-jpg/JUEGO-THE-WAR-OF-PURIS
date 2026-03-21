@@ -1051,26 +1051,48 @@
       return Math.min(Math.max(value, min), max);
     }
 
-    function isMobileDevice() {
-      const hasTouchPoints = navigator.maxTouchPoints > 0;
-      const userAgent = navigator.userAgent || "";
-      const mobileUserAgent = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini|Mobile/i.test(userAgent);
-      const userAgentDataMobile = typeof navigator.userAgentData?.mobile === "boolean"
-        ? navigator.userAgentData.mobile
-        : false;
-      const touchLikeDevice = COARSE_POINTER.matches || NO_HOVER_POINTER.matches || hasTouchPoints;
-      return MOBILE_BREAKPOINT.matches && (touchLikeDevice || mobileUserAgent || userAgentDataMobile);
+    // Corrección táctil: ya no dependemos del breakpoint de 768px para detectar móviles con touch real.
+    let lastTouchDebugSnapshot = "";
+
+    function isTouchDevice() {
+      return (
+        navigator.maxTouchPoints > 0 ||
+        COARSE_POINTER.matches ||
+        NO_HOVER_POINTER.matches ||
+        /Android|iPhone|iPad|iPod|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent || "") ||
+        (typeof navigator.userAgentData?.mobile === "boolean" && navigator.userAgentData.mobile)
+      );
     }
 
     function shouldBlockPortraitMobile() {
-      return isMobileDevice() && PORTRAIT_ORIENTATION.matches;
+      return isTouchDevice() && PORTRAIT_ORIENTATION.matches;
     }
 
     function isLandscapeMobile() {
-      return isMobileDevice() && !PORTRAIT_ORIENTATION.matches;
+      return isTouchDevice() && !PORTRAIT_ORIENTATION.matches;
+    }
+
+    function logTouchDebugState(context = "state") {
+      const snapshot = JSON.stringify({
+        context,
+        isTouchDevice: isTouchDevice(),
+        isLandscapeMobile: isLandscapeMobile(),
+        canUseTouchControls: running
+          && !isPaused
+          && isLandscapeMobile()
+          && !overlay.classList.contains("show")
+          && !celebrationOverlay.classList.contains("show"),
+        innerWidth: window.innerWidth,
+        maxTouchPoints: navigator.maxTouchPoints || 0
+      });
+
+      if (snapshot === lastTouchDebugSnapshot) return;
+      lastTouchDebugSnapshot = snapshot;
+      console.debug("[touch-debug]", JSON.parse(snapshot));
     }
 
     function syncOrientationOverlay() {
+      logTouchDebugState("syncOrientationOverlay");
       const shouldBlock = shouldBlockPortraitMobile();
       orientationOverlay.classList.toggle("show", shouldBlock);
       orientationOverlay.setAttribute("aria-hidden", shouldBlock ? "false" : "true");
@@ -1102,7 +1124,7 @@
     let lastLoggedBodyClassName = null;
 
     function syncGameUiState() {
-      const shouldUseMobileUi = mobileUiLocked || isMobileDevice();
+      const shouldUseMobileUi = mobileUiLocked || isTouchDevice();
       document.body.classList.toggle("mobile-ui", shouldUseMobileUi);
       document.body.classList.toggle("game-active", running && !overlay.classList.contains("show"));
 
@@ -2127,7 +2149,13 @@
     }
 
     function canUseTouchControls() {
-      return running && !isPaused && isLandscapeMobile() && !overlay.classList.contains("show") && !celebrationOverlay.classList.contains("show");
+      const enabled = running
+        && !isPaused
+        && isLandscapeMobile()
+        && !overlay.classList.contains("show")
+        && !celebrationOverlay.classList.contains("show");
+      logTouchDebugState("canUseTouchControls");
+      return enabled;
     }
 
     function applyMoveState() {
@@ -2169,7 +2197,7 @@
     }
 
     function requestGameFullscreen() {
-      if (!isMobileDevice()) return Promise.resolve(false);
+      if (!isTouchDevice()) return Promise.resolve(false);
 
       const targets = [appRoot, document.documentElement].filter(Boolean);
       for (const target of targets) {
@@ -2198,7 +2226,8 @@
     }
 
     function handleGameEntry() {
-      mobileUiLocked = isMobileDevice();
+      logTouchDebugState("handleGameEntry");
+      mobileUiLocked = isTouchDevice();
       unlockAudio();
       playIntroStinger();
       primeMobileViewport();
@@ -3734,7 +3763,10 @@
     }, { passive: false });
 
     [MOBILE_BREAKPOINT, COARSE_POINTER, NO_HOVER_POINTER, PORTRAIT_ORIENTATION].forEach((mediaQuery) => {
-      const handleChange = () => resizeCanvas();
+      const handleChange = () => {
+        logTouchDebugState("mediaQueryChange");
+        resizeCanvas();
+      };
       if (typeof mediaQuery.addEventListener === "function") {
         mediaQuery.addEventListener("change", handleChange);
       } else if (typeof mediaQuery.addListener === "function") {
@@ -3758,16 +3790,31 @@
     restartBtn.addEventListener("click", handleGameEntry);
     pauseRestartBtn.addEventListener("click", restartGameFromPause);
 
-    window.addEventListener("resize", resizeCanvas);
-    window.addEventListener("orientationchange", resizeCanvas);
-    document.addEventListener("fullscreenchange", resizeCanvas);
-    document.addEventListener("webkitfullscreenchange", resizeCanvas);
+    window.addEventListener("resize", () => {
+      logTouchDebugState("resize");
+      resizeCanvas();
+    });
+    window.addEventListener("orientationchange", () => {
+      logTouchDebugState("orientationchange");
+      resizeCanvas();
+    });
+    document.addEventListener("fullscreenchange", () => {
+      logTouchDebugState("fullscreenchange");
+      resizeCanvas();
+    });
+    document.addEventListener("webkitfullscreenchange", () => {
+      logTouchDebugState("webkitfullscreenchange");
+      resizeCanvas();
+    });
     if (window.visualViewport) {
-      window.visualViewport.addEventListener("resize", resizeCanvas);
+      window.visualViewport.addEventListener("resize", () => {
+        logTouchDebugState("visualViewportResize");
+        resizeCanvas();
+      });
     }
 
     document.addEventListener("touchmove", (event) => {
-      if (!isMobileDevice()) return;
+      if (!isTouchDevice()) return;
       if (event.target.closest("#stage") || event.target.closest("#pauseBtn") || event.target.closest("#ultimateBtn")) return;
       event.preventDefault();
     }, { passive: false });
