@@ -1016,6 +1016,7 @@
     let lastStageHeight = 0;
     let autoPausedByOrientation = false;
     let activeMoveTouchId = null;
+    let moveInputMode = null;
     let moveLeft = false;
     let moveRight = false;
     let mobileUiLocked = false;
@@ -3573,9 +3574,10 @@
       applyMoveState();
     }
 
-    // Limpieza al soltar/cancelar implementada acá: siempre resetea flags, modo y dedo activo para frenar la nave.
+    // Limpieza de estado al soltar/cancelar: resetea flags, modo y dedo/puntero activo para frenar la nave.
     function releaseMove() {
       activeMoveTouchId = null;
+      moveInputMode = null;
       moveLeft = false;
       moveRight = false;
       applyMoveState();
@@ -3618,62 +3620,106 @@
       if (["arrowleft", "arrowright", "a", "d"].includes(k)) releaseMove();
     });
 
-    function handleStageTouchStart(e) {
-      if (!canUseTouchControls()) return;
-
-      e.preventDefault();
-
-      const touch = e.touches[0];
-      if (!touch) return;
-
-      const handled = updateTouchMoveDirectionFromPoint(
-        touch.clientX,
-        touch.clientY,
-        e.target
-      );
-
-      if (handled) {
-        activeMoveTouchId = touch.identifier;
+    function findTrackedTouch(touchList) {
+      if (activeMoveTouchId === null) return null;
+      for (const touch of touchList) {
+        if (touch.identifier === activeMoveTouchId) return touch;
       }
+      return null;
     }
 
-    function handleStageTouchMove(e) {
-      if (!canUseTouchControls()) return;
+    // Handlers táctiles/pointer agregados acá: enganchan el input real del celular con la lógica izquierda/derecha ya existente.
+    const handleViewportPointerStart = (event) => {
+      if (!canUseTouchControls() || event.pointerType === "mouse") return;
+      if (activeMoveTouchId !== null && activeMoveTouchId !== event.pointerId) return;
 
-      const touch = Array.from(e.touches).find(
-        t => t.identifier === activeMoveTouchId
-      );
+      const target = event.target || document.elementFromPoint(event.clientX, event.clientY);
+      const started = updateTouchMoveDirectionFromPoint(event.clientX, event.clientY, target);
+      if (!started) return;
 
-      if (!touch) return;
+      moveInputMode = "pointer";
+      activeMoveTouchId = event.pointerId;
+      event.preventDefault();
+    };
 
-      e.preventDefault();
+    const handleViewportPointerMove = (event) => {
+      if (moveInputMode !== "pointer") return;
+      if (activeMoveTouchId !== event.pointerId) return;
 
-      updateTouchMoveDirectionFromPoint(
-        touch.clientX,
-        touch.clientY,
-        e.target
-      );
-    }
-
-    function handleStageTouchEnd(e) {
-      if (!canUseTouchControls()) return;
-
-      const stillActive = Array.from(e.touches).some(
-        t => t.identifier === activeMoveTouchId
-      );
-
-      if (!stillActive) {
-        activeMoveTouchId = null;
+      const target = document.elementFromPoint(event.clientX, event.clientY) || event.target;
+      if (!updateTouchMoveDirectionFromPoint(event.clientX, event.clientY, target)) {
         releaseMove();
       }
+      event.preventDefault();
+    };
+
+    const handleViewportPointerEnd = (event) => {
+      if (moveInputMode !== "pointer") return;
+      if (activeMoveTouchId !== event.pointerId) return;
+
+      activeMoveTouchId = null;
+      moveInputMode = null;
+      releaseMove();
+      event.preventDefault();
+    };
+
+    const handleViewportTouchStart = (event) => {
+      if (!canUseTouchControls() || activeMoveTouchId !== null) return;
+
+      for (const touch of event.changedTouches) {
+        const target = document.elementFromPoint(touch.clientX, touch.clientY) || event.target;
+        if (!updateTouchMoveDirectionFromPoint(touch.clientX, touch.clientY, target)) continue;
+
+        moveInputMode = "touch";
+        activeMoveTouchId = touch.identifier;
+        event.preventDefault();
+        break;
+      }
+    };
+
+    const handleViewportTouchMove = (event) => {
+      if (moveInputMode !== "touch") return;
+
+      const trackedTouch = findTrackedTouch(event.touches);
+      if (!trackedTouch) return;
+
+      const target = document.elementFromPoint(trackedTouch.clientX, trackedTouch.clientY) || event.target;
+      if (!updateTouchMoveDirectionFromPoint(trackedTouch.clientX, trackedTouch.clientY, target)) {
+        releaseMove();
+      }
+      event.preventDefault();
+    };
+
+    const handleViewportTouchEnd = (event) => {
+      if (moveInputMode !== "touch") return;
+
+      const trackedTouch = findTrackedTouch(event.changedTouches);
+      if (!trackedTouch) return;
+
+      activeMoveTouchId = null;
+      moveInputMode = null;
+      releaseMove();
+      event.preventDefault();
+    };
+
+    // Listeners globales en window agregados acá: el arrastre sigue funcionando incluso si el dedo sale del canvas/stage.
+    if (typeof window.PointerEvent === "function") {
+      window.addEventListener("pointerdown", handleViewportPointerStart, { passive: false });
+      window.addEventListener("pointermove", handleViewportPointerMove, { passive: false });
+      window.addEventListener("pointerup", handleViewportPointerEnd, { passive: false });
+      window.addEventListener("pointercancel", handleViewportPointerEnd, { passive: false });
+    } else {
+      window.addEventListener("touchstart", handleViewportTouchStart, { passive: false });
+      window.addEventListener("touchmove", handleViewportTouchMove, { passive: false });
+      window.addEventListener("touchend", handleViewportTouchEnd, { passive: false });
+      window.addEventListener("touchcancel", handleViewportTouchEnd, { passive: false });
     }
 
-    stage.addEventListener("touchstart", handleStageTouchStart, { passive: false });
-    stage.addEventListener("touchmove", handleStageTouchMove, { passive: false });
-    stage.addEventListener("touchend", handleStageTouchEnd, { passive: false });
-    stage.addEventListener("touchcancel", handleStageTouchEnd, { passive: false });
-
-    window.addEventListener("blur", releaseMove);
+    window.addEventListener("blur", () => {
+      activeMoveTouchId = null;
+      moveInputMode = null;
+      releaseMove();
+    });
 
     pauseBtn.onclick = togglePause;
 
