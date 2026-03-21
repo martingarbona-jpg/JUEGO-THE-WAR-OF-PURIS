@@ -861,7 +861,7 @@
           </div>
           <div class="card">
             <span class="label">Ulti</span>
-            <span class="value" id="ultimateHud">0/25</span>
+            <span class="value" id="ultimateHud">0/40</span>
           </div>
         </div>
         <button id="pauseBtn" type="button" aria-label="Pausar juego">⏸</button>
@@ -869,7 +869,7 @@
           <div class="ultimate-bar" aria-hidden="true">
             <div class="ultimate-bar-fill" id="ultimateBarFill"></div>
           </div>
-          <div class="ultimate-text" id="ultimateText">ULTI 0/25</div>
+          <div class="ultimate-text" id="ultimateText">ULTI 0/40</div>
           <button id="ultimateBtn" type="button" aria-label="Activar ulti" disabled>ULTI</button>
         </div>
 
@@ -1043,7 +1043,8 @@
     let shieldActive = false;
     let shieldTimer = 0;
     // Sistema de carga de ulti: reemplaza por completo la vieja progresión diamante.
-    const ultimateHitsRequired = 25;
+    // Cambio puntual: el requisito de carga de la ulti ahora es de 40 impactos efectivos a bosses.
+    const ultimateHitsRequired = 40;
     const ultimateDuration = 60 * 7.5;
     let ultimateHits = 0;
     let ultimateReady = false;
@@ -1669,8 +1670,9 @@
       shieldTimer = 60 * 5;
     }
 
-    function registerUltimateHit() {
-      if (ultimateActive || ultimateReady) return;
+    function registerUltimateHit(targetType) {
+      // Cambio puntual: solo se cuentan impactos reales contra bosses para cargar la ulti.
+      if (targetType !== "boss" || ultimateActive || ultimateReady) return;
       ultimateHits = Math.min(ultimateHitsRequired, ultimateHits + 1);
       if (ultimateHits >= ultimateHitsRequired) {
         ultimateHits = ultimateHitsRequired;
@@ -2629,7 +2631,7 @@
             e.hp -= b.damage;
             playHitSound("enemy");
 
-            registerUltimateHit();
+            registerUltimateHit("enemy");
 
             if (b.type !== "laser-red" && b.type !== "laser-gold") {
               bullets.splice(i, 1);
@@ -2659,7 +2661,7 @@
           boss.hp -= b.damage;
           playHitSound("boss");
 
-          registerUltimateHit();
+          registerUltimateHit("boss");
 
           if (b.type !== "laser-red" && b.type !== "laser-gold") {
             bullets.splice(i, 1);
