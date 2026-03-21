@@ -857,7 +857,7 @@
           </div>
           <div class="card">
             <span class="label">Próx. mejora</span>
-            <span class="value" id="nextUpgrade">25</span>
+            <span class="value" id="nextUpgrade">20</span>
           </div>
           <div class="card">
             <span class="label">Ulti</span>
@@ -960,8 +960,8 @@
     const moveRightBtn = document.getElementById("moveRightBtn");
     const ultimateBtn = document.getElementById("ultimateBtn");
 
-    // Ajuste puntual de umbrales de mejora por monedas: nivel 4 ahora requiere 175 en vez de 190
-    const UPGRADE_STEPS = [25, 75, 175, 290];
+    // Ajuste puntual de la primera mejora por monedas: ahora se desbloquea con 20 en vez de 25.
+    const UPGRADE_STEPS = [20, 75, 175, 290];
     const FIRST_BOSS_TIME = 30;
     const SECOND_BOSS_DELAY_AFTER_KILL = 30;
     const THIRD_BOSS_DELAY_AFTER_KILL = 30;
@@ -1435,7 +1435,7 @@
       if (coins >= 290) return 5;
       if (coins >= 175) return 4;
       if (coins >= 75) return 3;
-      if (coins >= 25) return 2;
+      if (coins >= 20) return 2;
       return 1;
     }
 
@@ -2575,8 +2575,8 @@
           // Ajuste del comportamiento del Boss 3: gana un poco más de frecuencia, sin tocar el patrón general del Boss 4.
           boss.type === 1 ? 84 :
           boss.type === 2 ? 66 :
-          boss.type === 3 ? 58 :
-          50;
+          boss.type === 3 ? 64 :
+          56;
         boss.fireCooldown = Math.max(20, Math.round(baseCooldown / bossAggressionMultiplier(boss.type)));
       }
     }
@@ -2602,13 +2602,14 @@
         speed = 1.84;
         radius = 7;
       } else if (boss.type === 3) {
-        // Ajuste del comportamiento del Boss 3: un paso intermedio entre el Boss 3 anterior y el Boss 4 actual.
-        pattern = [-0.92, -0.56, -0.2, 0.2, 0.56, 0.92];
-        speed = 2;
+        // Ajuste puntual de balance del Boss 3: menos densidad y más separación para abrir huecos reales.
+        pattern = [-0.9, -0.46, 0, 0.46, 0.9];
+        speed = 1.82;
         radius = 7;
       } else {
-        pattern = [-1.04, -0.7, -0.34, 0, 0.34, 0.7, 1.04];
-        speed = 2.22;
+        // Ajuste puntual de balance del Boss 4/final: sigue siendo el más difícil, pero con ventanas de esquive más legibles.
+        pattern = [-1.02, -0.64, -0.26, 0.26, 0.64, 1.02];
+        speed = 2.06;
         radius = 8;
       }
 
