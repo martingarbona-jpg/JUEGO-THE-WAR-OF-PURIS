@@ -101,17 +101,18 @@
       max-width: 100%;
       max-height: 100%;
       flex-shrink: 0;
+      z-index: 1;
       touch-action: none;
       -webkit-user-select: none;
       user-select: none;
     }
 
-    /* Botones móviles visibles restaurados: se dibujan fuera del canvas, sobre los márgenes laterales vacíos. */
+    /* Visibilidad persistente: este contenedor vive en el layout general del juego, no dentro del overlay del menú. */
     .mobile-controls {
       position: absolute;
       inset: 0;
       pointer-events: none;
-      z-index: 1030;
+      z-index: 1050;
       display: none;
     }
 
@@ -157,7 +158,7 @@
       position: absolute;
       top: 10px;
       right: 10px;
-      z-index: 1000;
+      z-index: 1080;
       font-size: 20px;
       padding: 10px 14px;
       border-radius: 10px;
@@ -166,13 +167,13 @@
       color: white;
     }
 
-    /* Botón de ulti fijo a la derecha y barra visible en desktop + móvil. */
+    /* Capa/z-index corregido: los laterales quedan arriba del canvas pero abajo de pausa y ulti. */
     .ultimate-ui {
       position: absolute;
       right: 12px;
       top: 50%;
       transform: translateY(-50%);
-      z-index: 1040;
+      z-index: 1070;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -1170,6 +1171,12 @@
       }
     }
 
+    function syncPersistentMobileControlsVisibility(hasSideMargins = true) {
+      const shouldShowControls = document.body.classList.contains("mobile-ui") && isLandscapeMobile() && hasSideMargins;
+      mobileControls.style.display = shouldShowControls ? "block" : "none";
+      mobileControls.setAttribute("aria-hidden", shouldShowControls ? "false" : "true");
+    }
+
     function updateMobileControlsLayout() {
       const canvasRect = canvasBox.getBoundingClientRect();
       const stageRect = stage.getBoundingClientRect();
@@ -1177,10 +1184,12 @@
       const rightGap = Math.max(0, canvasRect.right - stageRect.right);
       const controlCenterY = clamp(stageRect.top - canvasRect.top + stageRect.height * 0.58, 0, canvasRect.height);
 
+      const hasSideMargins = leftGap >= 24 && rightGap >= 24;
+
       canvasBox.style.setProperty("--stage-left-gap", `${leftGap}px`);
       canvasBox.style.setProperty("--stage-right-gap", `${rightGap}px`);
       canvasBox.style.setProperty("--mobile-control-top", `${controlCenterY}px`);
-      mobileControls.setAttribute("aria-hidden", leftGap < 24 || rightGap < 24 ? "true" : "false");
+      syncPersistentMobileControlsVisibility(hasSideMargins);
     }
 
     function syncMobileViewportState() {
@@ -3675,9 +3684,14 @@
     });
 
     function bindMoveButton(button, direction) {
+      // Touch/pointer durante gameplay corregido acá: se captura el gesto al presionar y se libera recién al soltar/cancelar.
       const startMove = (event) => {
         if (!canUseTouchControls()) return;
-        activeTouchId = event.pointerId ?? event.changedTouches?.[0]?.identifier ?? direction;
+        const pointerId = event.pointerId ?? event.changedTouches?.[0]?.identifier ?? direction;
+        activeTouchId = pointerId;
+        if (event.pointerId !== undefined && typeof button.setPointerCapture === "function") {
+          button.setPointerCapture(event.pointerId);
+        }
         setActiveMoveDirection(direction);
         event.preventDefault();
       };
@@ -3685,6 +3699,9 @@
       const stopMove = (event) => {
         const pointerId = event.pointerId ?? event.changedTouches?.[0]?.identifier ?? direction;
         if (activeTouchId !== null && pointerId !== activeTouchId && pointerId !== direction) return;
+        if (event.pointerId !== undefined && typeof button.releasePointerCapture === "function" && button.hasPointerCapture?.(event.pointerId)) {
+          button.releasePointerCapture(event.pointerId);
+        }
         releaseMove();
         event.preventDefault();
       };
@@ -3692,17 +3709,31 @@
       button.addEventListener("pointerdown", startMove, { passive: false });
       button.addEventListener("pointerup", stopMove, { passive: false });
       button.addEventListener("pointercancel", stopMove, { passive: false });
-      button.addEventListener("pointerleave", stopMove, { passive: false });
       button.addEventListener("touchstart", startMove, { passive: false });
       button.addEventListener("touchend", stopMove, { passive: false });
       button.addEventListener("touchcancel", stopMove, { passive: false });
       button.addEventListener("mousedown", startMove);
       button.addEventListener("mouseup", stopMove);
-      button.addEventListener("mouseleave", stopMove);
+      button.addEventListener("mouseleave", (event) => {
+        if (event.buttons === 0) stopMove(event);
+      });
     }
 
     bindMoveButton(moveLeftBtn, "left");
     bindMoveButton(moveRightBtn, "right");
+
+    const stopTouchMoveControls = (event) => {
+      if (activeTouchId === null) return;
+      const pointerId = event.pointerId ?? event.changedTouches?.[0]?.identifier ?? activeTouchId;
+      if (pointerId !== activeTouchId && pointerId !== "left" && pointerId !== "right") return;
+      releaseMove();
+    };
+
+    window.addEventListener("pointerup", stopTouchMoveControls, { passive: true });
+    window.addEventListener("pointercancel", stopTouchMoveControls, { passive: true });
+    window.addEventListener("touchend", stopTouchMoveControls, { passive: true });
+    window.addEventListener("touchcancel", stopTouchMoveControls, { passive: true });
+    window.addEventListener("blur", releaseMove);
 
     pauseBtn.onclick = togglePause;
 
