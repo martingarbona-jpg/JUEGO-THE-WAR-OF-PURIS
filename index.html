@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#000000" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>PURIS VS LAS MAQUINAS</title>
+  <title>Capitán Facu</title>
   <style>
     * { box-sizing: border-box; }
 
@@ -321,10 +321,37 @@
 
     @keyframes titleGlow {
       0%, 100% {
-        filter: drop-shadow(0 0 10px rgba(250, 204, 21, 0.12));
+        filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.18)) drop-shadow(0 0 26px rgba(244, 114, 182, 0.16));
       }
       50% {
-        filter: drop-shadow(0 0 18px rgba(250, 204, 21, 0.22));
+        filter: drop-shadow(0 0 18px rgba(34, 211, 238, 0.34)) drop-shadow(0 0 34px rgba(250, 204, 21, 0.22));
+      }
+    }
+
+    @keyframes titleFloat {
+      0%, 100% {
+        transform: translateY(0) scale(1);
+      }
+      50% {
+        transform: translateY(-6px) scale(1.03);
+      }
+    }
+
+    @keyframes titleShine {
+      0% {
+        transform: translateX(-135%) skewX(-18deg);
+        opacity: 0;
+      }
+      18% {
+        opacity: 0.55;
+      }
+      42% {
+        transform: translateX(135%) skewX(-18deg);
+        opacity: 0;
+      }
+      100% {
+        transform: translateX(135%) skewX(-18deg);
+        opacity: 0;
       }
     }
 
@@ -436,41 +463,82 @@
       box-shadow: 0 20px 50px rgba(0, 0, 0, 0.42);
     }
 
+    /* Logo/título animado de la pantalla de inicio: "Capitán Facu". */
     .start-title {
       position: relative;
-      margin: 0 0 16px;
-      font-size: clamp(40px, 6vw, 64px);
-      line-height: 0.95;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
+      isolation: isolate;
+      margin: 0 0 18px;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      line-height: 0.88;
       font-weight: 900;
-      color: #f8fafc;
-      background: linear-gradient(180deg, #fef08a 0%, #facc15 38%, #f97316 100%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-      text-shadow:
-        0 3px 0 rgba(124, 45, 18, 0.9),
-        0 10px 24px rgba(249, 115, 22, 0.22),
-        0 0 18px rgba(250, 204, 21, 0.28);
-      filter: drop-shadow(0 0 14px rgba(250, 204, 21, 0.18));
       transform-origin: center;
-    }
-
-    .start-title::after {
-      content: attr(data-title);
-      position: absolute;
-      inset: 0;
-      z-index: -1;
-      color: transparent;
-      -webkit-text-stroke: 3px rgba(15, 23, 42, 0.9);
-      text-shadow: 0 6px 16px rgba(0, 0, 0, 0.38);
+      text-transform: uppercase;
       pointer-events: none;
     }
 
+    .start-title::before {
+      content: "";
+      position: absolute;
+      inset: -12px 12%;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(34, 211, 238, 0.18) 0%, rgba(168, 85, 247, 0.1) 46%, transparent 76%);
+      z-index: -2;
+      filter: blur(8px);
+    }
+
+    .start-title::after {
+      content: "";
+      position: absolute;
+      top: -8%;
+      bottom: -10%;
+      left: -16%;
+      width: 30%;
+      background: linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0.06) 28%, rgba(255, 255, 255, 0.62) 48%, rgba(255, 255, 255, 0.08) 72%, transparent 100%);
+      mix-blend-mode: screen;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-135%) skewX(-18deg);
+    }
+
+    .start-title-line {
+      position: relative;
+      display: block;
+      padding: 0.08em 0.18em;
+      font-size: clamp(36px, 6vw, 68px);
+      letter-spacing: 0.12em;
+      color: #f8fafc;
+      background: linear-gradient(180deg, #fefce8 0%, #67e8f9 18%, #60a5fa 40%, #a855f7 72%, #fb7185 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      -webkit-text-stroke: 2px rgba(15, 23, 42, 0.95);
+      text-shadow:
+        0 4px 0 rgba(15, 23, 42, 0.95),
+        0 10px 22px rgba(56, 189, 248, 0.28),
+        0 0 22px rgba(236, 72, 153, 0.26);
+    }
+
+    .start-title-line--accent {
+      font-size: clamp(42px, 7vw, 78px);
+      letter-spacing: 0.16em;
+      background: linear-gradient(180deg, #fef08a 0%, #facc15 26%, #fb7185 60%, #c084fc 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
 
     .overlay.start-screen .start-title {
-      animation: titleEntrance 680ms cubic-bezier(0.2, 0.9, 0.24, 1.15) both, titleGlow 2.6s ease-in-out 700ms infinite;
+      animation:
+        titleEntrance 680ms cubic-bezier(0.2, 0.9, 0.24, 1.15) both,
+        titleFloat 3.2s ease-in-out 720ms infinite,
+        titleGlow 2.8s ease-in-out 720ms infinite;
+    }
+
+    .overlay.start-screen .start-title::after {
+      animation: titleShine 3.8s ease-in-out 1.15s infinite;
     }
 
     .start-text {
@@ -616,13 +684,17 @@
       }
 
       body.mobile-ui .start-title {
-        font-size: clamp(28px, 8vw, 38px);
-        letter-spacing: 0.08em;
-        line-height: 1;
+        gap: 0;
       }
 
-      body.mobile-ui .start-title::after {
-        -webkit-text-stroke: 2px rgba(15, 23, 42, 0.9);
+      body.mobile-ui .start-title-line {
+        font-size: clamp(30px, 8vw, 46px);
+        letter-spacing: 0.08em;
+        -webkit-text-stroke: 1.6px rgba(15, 23, 42, 0.95);
+      }
+
+      body.mobile-ui .start-title-line--accent {
+        font-size: clamp(34px, 9vw, 54px);
       }
     }
 
@@ -689,7 +761,8 @@
 
         <div class="overlay show" id="overlay">
           <div class="panel start-panel">
-            <h1 class="start-title" id="overlayTitle" data-title="LA BATALLA DEL PURIS">LA BATALLA DEL PURIS</h1>
+            <!-- Logo/título animado modificado acá: pantalla inicial "Capitán Facu". -->
+            <h1 class="start-title" id="overlayTitle" aria-label="Capitán Facu"><span class="start-title-line">Capitán</span><span class="start-title-line start-title-line--accent">Facu</span></h1>
             <p class="start-text" id="overlayText">
               Entrá en combate cuando estés listo. Al tocar JUGAR se intentará abrir el juego en fullscreen para aprovechar mejor la pantalla del celular.
             </p>
@@ -1563,8 +1636,8 @@
       running = false;
       isPaused = false;
       overlay.dataset.mode = "start";
-      overlayTitle.textContent = "LA BATALLA DEL PURIS";
-      overlayTitle.dataset.title = "LA BATALLA DEL PURIS";
+      overlayTitle.innerHTML = '<span class="start-title-line">Capitán</span><span class="start-title-line start-title-line--accent">Facu</span>';
+      overlayTitle.setAttribute("aria-label", "Capitán Facu");
       overlayText.innerHTML = "Entrá en combate cuando estés listo.<br>Al tocar <strong>JUGAR</strong> se intentará abrir el juego en fullscreen para aprovechar mejor la pantalla del celular.";
       overlayExtra.hidden = true;
       overlayExtra.textContent = "";
@@ -1591,7 +1664,7 @@
     function showPauseOverlay() {
       overlay.dataset.mode = "pause";
       overlayTitle.textContent = "PAUSA";
-      overlayTitle.dataset.title = "PAUSA";
+      overlayTitle.removeAttribute("aria-label");
       overlayText.textContent = "La partida está en pausa.";
       overlayExtra.hidden = true;
       overlayExtra.textContent = "";
@@ -1626,7 +1699,7 @@
       updateHud();
       updatePauseButton();
       overlayTitle.textContent = "PURIS VS LAS MAQUINAS";
-      overlayTitle.dataset.title = "PURIS VS LAS MAQUINAS";
+      overlayTitle.removeAttribute("aria-label");
       overlayText.textContent = `Monedas: ${coins} | Tiempo: ${elapsedSeconds}s | Arma final: ${diamondMode ? "Diamante" : weaponLevel}`;
       overlayExtra.hidden = !finalVictoryAchieved;
       overlayExtra.innerHTML = finalVictoryAchieved
