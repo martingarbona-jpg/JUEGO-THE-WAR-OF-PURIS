@@ -1049,6 +1049,7 @@
     let ultimateReady = false;
     let ultimateActive = false;
     let ultimateTimer = 0;
+    let ultimateCtrlHeld = false;
     let screenShake = 0;
     let screenShakeStrength = 0;
     let flashTimer = 0;
@@ -1713,6 +1714,15 @@
         ultimateActive = false;
         ultimateTimer = 0;
       }
+    }
+
+    function isUltimateCtrlKey(event) {
+      return event.key === "Control" || event.code === "ControlLeft" || event.code === "ControlRight";
+    }
+
+    function canActivateUltimateFromKeyboard() {
+      syncUltimateReadyState();
+      return ultimateReady && !ultimateActive && running && !isPaused && overlay.dataset.mode === "playing" && !waitingForFinalCelebrationAdvance;
     }
 
     function applyPlayerDamage(amount, cooldown, explosionColor, shake, flash) {
@@ -3602,12 +3612,27 @@
         return;
       }
 
+      // Activación de ulti en PC con CTRL, con antirepetición para evitar múltiples disparos al mantener la tecla.
+      if (isUltimateCtrlKey(e)) {
+        if (ultimateCtrlHeld) return;
+        ultimateCtrlHeld = true;
+        if (canActivateUltimateFromKeyboard()) {
+          e.preventDefault();
+          activateUltimate();
+        }
+        return;
+      }
+
       const k = e.key.toLowerCase();
       if (k === "arrowleft" || k === "a") pressLeft();
       if (k === "arrowright" || k === "d") pressRight();
     });
 
     document.addEventListener("keyup", (e) => {
+      if (isUltimateCtrlKey(e)) {
+        ultimateCtrlHeld = false;
+        return;
+      }
       const k = e.key.toLowerCase();
       if (["arrowleft", "arrowright", "a", "d"].includes(k)) releaseMove();
     });
