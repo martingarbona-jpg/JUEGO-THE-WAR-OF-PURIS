@@ -1440,9 +1440,10 @@
     }
 
     function spawnPressureMultiplier() {
-      let multiplier = 1;
+      let multiplier = 1.05;
 
-      if (advancedEnemiesUnlocked) multiplier *= 1.1;
+      // Rebalance de bichitos: apenas sube la presión general de oleadas para compensar la ulti con escudo.
+      if (advancedEnemiesUnlocked) multiplier *= 1.12;
       if (postBoss3DifficultyUnlocked) multiplier *= 1.2;
 
       return multiplier;
@@ -1453,12 +1454,13 @@
     }
 
     function maxSpecialEnemiesAllowed() {
-      return postBoss3DifficultyUnlocked ? 5 : 4;
+      return postBoss3DifficultyUnlocked ? 6 : 5;
     }
 
     function bossAggressionMultiplier(type) {
-      if (type === 1) return 1.03;
-      if (type === 2) return 1.1;
+      // Rebalance de bosses 1 y 2: un toque más de presión sin tocar la lógica nueva de la ulti.
+      if (type === 1) return 1.08;
+      if (type === 2) return 1.14;
       if (type === 3) return 1.2;
       return 1.28;
     }
@@ -1594,21 +1596,22 @@
       const shooterCount = enemies.filter(enemy => enemy.enemyType === "shooter").length;
       const kamikazeCount = enemies.filter(enemy => enemy.enemyType === "kamikaze").length;
       const maxSpecialEnemies = maxSpecialEnemiesAllowed();
-      const zigzagChance = enemyHorizontalFactor > 0 ? 0.38 : 0.2;
+      const zigzagChance = enemyHorizontalFactor > 0 ? 0.36 : 0.18;
 
       if (!advancedEnemiesUnlocked) {
         return Math.random() < zigzagChance ? "zigzag" : "normal";
       }
 
-      if (roll < 0.10 && trackerCount < 2 && specialEnemies.length < maxSpecialEnemies) {
+      // Rebalance de bichitos: más presencia de shooters/ranged, manteniendo variedad y sin llenar la pantalla de proyectiles.
+      if (roll < 0.09 && trackerCount < 2 && specialEnemies.length < maxSpecialEnemies) {
         return "tracker";
       }
 
-      if (roll < 0.20 && shooterCount < 2 && specialEnemies.length < maxSpecialEnemies) {
+      if (roll < 0.31 && shooterCount < 3 && specialEnemies.length < maxSpecialEnemies) {
         return "shooter";
       }
 
-      if (roll < 0.30 && kamikazeCount < 2 && specialEnemies.length < maxSpecialEnemies) {
+      if (roll < 0.40 && kamikazeCount < 2 && specialEnemies.length < maxSpecialEnemies) {
         return "kamikaze";
       }
 
@@ -1971,7 +1974,7 @@
         theme: currentBossTheme,
         dx: horizontalSpeed,
         enemyType,
-        fireCooldown: enemyType === "shooter" ? 68 + Math.floor(Math.random() * 28) : 0,
+        fireCooldown: enemyType === "shooter" ? 60 + Math.floor(Math.random() * 24) : 0,
         trackingStrength: enemyType === "tracker" ? (0.038 + Math.random() * 0.018) * 1.12 : 0,
         trackingMax: enemyType === "tracker" ? (1.08 + Math.random() * 0.5) * 1.12 : 0,
         kamikazeRange: enemyType === "kamikaze" ? 120 : 0,
@@ -2052,12 +2055,12 @@
       currentBossTheme = bossIndex;
       triggerBossIntro(bossIndex);
 
-      // Ajuste puntual del boss final: -8% de vida y una pausa apenas mayor entre ráfagas.
+      // Rebalance de vida de bosses: valores exactos pedidos para compensar la ulti con escudo.
       const hp =
-        bossIndex === 1 ? 200 :
-        bossIndex === 2 ? 750 :
-        bossIndex === 3 ? 1200 :
-        1840;
+        bossIndex === 1 ? 300 :
+        bossIndex === 2 ? 1000 :
+        bossIndex === 3 ? 1750 :
+        3000;
 
       const moveSpeed =
         bossIndex === 1 ? 1.15 :
@@ -2547,8 +2550,9 @@
       if (boss.fireCooldown <= 0) {
         fireBossPattern();
         const baseCooldown =
-          boss.type === 1 ? 124 :
-          boss.type === 2 ? 78 :
+          // Rebalance de bosses 1 y 2: apenas más frecuencia para que vuelvan a sentirse tensos.
+          boss.type === 1 ? 118 :
+          boss.type === 2 ? 74 :
           boss.type === 3 ? 66 :
           50;
         boss.fireCooldown = Math.max(20, Math.round(baseCooldown / bossAggressionMultiplier(boss.type)));
@@ -2567,11 +2571,11 @@
 
       if (boss.type === 1) {
         pattern = [-0.34, 0, 0.34];
-        speed = 1.3;
+        speed = 1.36;
         radius = 6;
       } else if (boss.type === 2) {
         pattern = [-0.58, -0.2, 0.2, 0.58];
-        speed = 1.74;
+        speed = 1.8;
         radius = 6;
       } else if (boss.type === 3) {
         pattern = [-0.84, -0.42, 0, 0.42, 0.84];
@@ -2779,7 +2783,7 @@
 
     function updateDifficulty() {
       const stage = Math.floor(elapsedSeconds / 18);
-      const baseSpawnRate = 54 - stage * 2;
+      const baseSpawnRate = 52 - stage * 2;
       enemyBaseSpeed = 1.65 + stage * 0.08 + (advancedEnemiesUnlocked ? 0.08 : 0);
       enemySpawnRate = Math.max(12, Math.round(baseSpawnRate / spawnPressureMultiplier()));
       autoFireRate = Math.max(8, 13 - Math.floor(stage / 4));
