@@ -655,29 +655,6 @@
       flex-shrink: 0;
     }
 
-    .mobile-controls {
-      display: none;
-      gap: 12px;
-      padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
-      background: rgba(2, 6, 23, 0.96);
-      border-top: 1px solid rgba(148, 163, 184, 0.18);
-      box-shadow: 0 -10px 28px rgba(0,0,0,0.26);
-      flex-shrink: 0;
-    }
-
-    .mobile-btn {
-      background: rgba(30, 41, 59, 0.95);
-      color: white;
-      border: 1px solid rgba(148,163,184,0.25);
-      border-radius: 16px;
-      padding: 16px 10px;
-      font-size: 24px;
-      font-weight: bold;
-      user-select: none;
-      -webkit-user-select: none;
-      touch-action: manipulation;
-      min-height: 72px;
-    }
 
     body.mobile-ui .hud {
       display: none !important;
@@ -751,14 +728,6 @@
         display: none;
       }
 
-      body.mobile-ui.game-active .mobile-controls {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      body.mobile-ui.game-active .mobile-btn {
-        font-size: 28px;
-      }
 
       body.mobile-ui .start-panel {
         max-width: 100%;
@@ -912,13 +881,9 @@
       </div>
     </div>
 
-    <div class="mobile-controls" id="mobileControls" aria-label="Controles móviles">
-      <button class="mobile-btn" id="moveLeftBtn" type="button" aria-label="Mover a la izquierda">⬅</button>
-      <button class="mobile-btn" id="moveRightBtn" type="button" aria-label="Mover a la derecha">➡</button>
-    </div>
 
     <div class="help">
-      PC: ← → o A / D &nbsp; | &nbsp; Celular: usá los botones inferiores para mover la nave
+      PC: ← → o A / D &nbsp; | &nbsp; Celular: tocá los laterales de la pantalla para mover la nave
     </div>
   </div>
 
@@ -956,8 +921,6 @@
 
     const pauseBtn = document.getElementById("pauseBtn");
     const restartBtn = document.getElementById("restartBtn");
-    const moveLeftBtn = document.getElementById("moveLeftBtn");
-    const moveRightBtn = document.getElementById("moveRightBtn");
     const ultimateBtn = document.getElementById("ultimateBtn");
 
     // Ajuste puntual de la primera mejora por monedas: ahora se desbloquea con 20 en vez de 25.
@@ -1029,6 +992,8 @@
     let lastStageHeight = 0;
     let autoPausedByOrientation = false;
     let activeTouchId = null;
+    let moveLeft = false;
+    let moveRight = false;
     let mobileUiLocked = false;
     let celebrationAnimationId = null;
     let celebrationTimeoutId = null;
@@ -2130,50 +2095,70 @@
     }
 
     function canUseTouchControls() {
-      return running && !isPaused && !isMobileDevice() && !shouldBlockPortraitMobile() && !overlay.classList.contains("show") && !celebrationOverlay.classList.contains("show");
+      return running && !isPaused && !shouldBlockPortraitMobile() && !overlay.classList.contains("show") && !celebrationOverlay.classList.contains("show");
     }
 
-    function moveByTouchPoint(clientX) {
-      const rect = stage.getBoundingClientRect();
-      const x = clientX - rect.left;
-      if (x < rect.width / 2) {
-        pressLeft();
-      } else {
-        pressRight();
+    function applyMoveState() {
+      if (moveLeft === moveRight) {
+        player.dx = 0;
+        return;
       }
+      player.dx = moveLeft ? -player.speed : player.speed;
     }
 
-    function getTrackedTouch(touchList) {
+    // Zonas táctiles invisibles: mitad izquierda mueve a la izquierda y mitad derecha mueve a la derecha.
+    function moveByTouchPoint(clientX) {
+      const rect = canvas.getBoundingClientRect();
+      const x = clientX - rect.left;
+      moveLeft = x < rect.width / 2;
+      moveRight = !moveLeft;
+      applyMoveState();
+    }
+
+    function getTouchById(touchList, identifier) {
+      if (identifier === null) return null;
       for (const touch of touchList) {
-        if (touch.identifier === activeTouchId) return touch;
+        if (touch.identifier === identifier) return touch;
       }
       return null;
     }
 
-    function handleStageTouchStart(e) {
-      if (activeTouchId !== null) return;
+    function getLastTouch(touchList) {
+      return touchList && touchList.length ? touchList[touchList.length - 1] : null;
+    }
+
+    // Acá se corrigieron los listeners táctiles: el touch inicia en el canvas y luego se sigue por el touch activo.
+    function handleGameTouchStart(e) {
+      // Acá se evita interferir con pausa/ulti ignorando cualquier toque sobre esos botones.
       if (!canUseTouchControls() || e.target.closest("#pauseBtn") || e.target.closest("#ultimateBtn")) return;
-      const touch = e.changedTouches[0];
+      const touch = getLastTouch(e.changedTouches);
       if (!touch) return;
       activeTouchId = touch.identifier;
       moveByTouchPoint(touch.clientX);
       e.preventDefault();
     }
 
-    function handleStageTouchMove(e) {
+    function handleGameTouchMove(e) {
       if (activeTouchId === null || !canUseTouchControls()) return;
-      const touch = getTrackedTouch(e.changedTouches) || getTrackedTouch(e.touches);
+      const touch = getTouchById(e.touches, activeTouchId);
       if (!touch) return;
       moveByTouchPoint(touch.clientX);
       e.preventDefault();
     }
 
-    function handleStageTouchEnd(e) {
+    function handleGameTouchEnd(e) {
       if (activeTouchId === null) return;
-      const touch = getTrackedTouch(e.changedTouches);
-      if (!touch) return;
-      activeTouchId = null;
-      releaseMove();
+      const endedTouch = getTouchById(e.changedTouches, activeTouchId);
+      if (!endedTouch) return;
+      const nextTouch = getLastTouch(e.touches);
+      if (nextTouch) {
+        activeTouchId = nextTouch.identifier;
+        moveByTouchPoint(nextTouch.clientX);
+      } else {
+        activeTouchId = null;
+        // Acá se limpian los flags al soltar para detener el movimiento inmediatamente.
+        releaseMove();
+      }
       e.preventDefault();
     }
 
@@ -2214,24 +2199,6 @@
       primeMobileViewport();
       requestGameFullscreen();
       startGame();
-    }
-
-    function bindPressControl(button, onPress) {
-      if (!button) return;
-
-      const stop = (event) => {
-        event.preventDefault();
-        releaseMove();
-      };
-
-      button.addEventListener("pointerdown", (event) => {
-        event.preventDefault();
-        onPress();
-      });
-      button.addEventListener("pointerup", stop);
-      button.addEventListener("pointercancel", stop);
-      button.addEventListener("pointerleave", stop);
-      button.addEventListener("lostpointercapture", stop);
     }
 
     function createCelebrationParticles(reset = true) {
@@ -3591,15 +3558,21 @@
     }
 
     function pressLeft() {
-      player.dx = -player.speed;
+      moveLeft = true;
+      moveRight = false;
+      applyMoveState();
     }
 
     function pressRight() {
-      player.dx = player.speed;
+      moveLeft = false;
+      moveRight = true;
+      applyMoveState();
     }
 
     function releaseMove() {
-      player.dx = 0;
+      moveLeft = false;
+      moveRight = false;
+      applyMoveState();
     }
 
     document.addEventListener("keydown", (e) => {
@@ -3639,10 +3612,10 @@
       if (["arrowleft", "arrowright", "a", "d"].includes(k)) releaseMove();
     });
 
-    stage.addEventListener("touchstart", handleStageTouchStart, { passive: false });
-    stage.addEventListener("touchmove", handleStageTouchMove, { passive: false });
-    stage.addEventListener("touchend", handleStageTouchEnd, { passive: false });
-    stage.addEventListener("touchcancel", handleStageTouchEnd, { passive: false });
+    canvas.addEventListener("touchstart", handleGameTouchStart, { passive: false });
+    window.addEventListener("touchmove", handleGameTouchMove, { passive: false });
+    window.addEventListener("touchend", handleGameTouchEnd, { passive: false });
+    window.addEventListener("touchcancel", handleGameTouchEnd, { passive: false });
 
     pauseBtn.onclick = togglePause;
 
@@ -3681,9 +3654,6 @@
     restartBtn.addEventListener("click", handleGameEntry);
     pauseRestartBtn.addEventListener("click", restartGameFromPause);
 
-    bindPressControl(moveLeftBtn, pressLeft);
-    bindPressControl(moveRightBtn, pressRight);
-
     window.addEventListener("resize", resizeCanvas);
     window.addEventListener("orientationchange", resizeCanvas);
     document.addEventListener("fullscreenchange", resizeCanvas);
@@ -3694,7 +3664,7 @@
 
     document.addEventListener("touchmove", (event) => {
       if (!isMobileDevice()) return;
-      if (event.target.closest("#stage") || event.target.closest("#pauseBtn") || event.target.closest("#mobileControls") || event.target.closest("#ultimateBtn")) return;
+      if (event.target.closest("#stage") || event.target.closest("#pauseBtn") || event.target.closest("#ultimateBtn")) return;
       event.preventDefault();
     }, { passive: false });
 
