@@ -35,6 +35,13 @@
       position: relative;
     }
 
+    body.mobile-ui.game-active,
+    body.mobile-ui.game-active .canvas-box,
+    body.mobile-ui.game-active .stage,
+    body.mobile-ui.game-active canvas {
+      touch-action: none;
+    }
+
     .wrap {
       width: min(100%, 920px);
       min-height: calc(100dvh - 20px);
@@ -900,7 +907,7 @@
 
 
     <div class="help">
-      PC: ← → o A / D &nbsp; | &nbsp; Celular: usá los botones laterales para mover la nave
+      PC: ← → o A / D &nbsp; | &nbsp; Celular: media pantalla izquierda/derecha para mover la nave
     </div>
   </div>
 
@@ -1009,6 +1016,8 @@
     let lastStageHeight = 0;
     let autoPausedByOrientation = false;
     let activeMoveTouchId = null;
+    let moveInputMode = null;
+    const USE_POINTER_EVENTS_FOR_MOBILE_MOVE = typeof window.PointerEvent === "function";
     let moveLeft = false;
     let moveRight = false;
     let mobileUiLocked = false;
@@ -1814,6 +1823,7 @@
     function showStartScreen() {
       running = false;
       isPaused = false;
+      releaseMove();
       overlay.dataset.mode = "start";
       overlayTitle.innerHTML = '<span class="start-title-line">Capitán</span><span class="start-title-line start-title-line--accent">Facu</span>';
       overlayTitle.setAttribute("aria-label", "Capitán Facu");
@@ -1841,6 +1851,7 @@
     }
 
     function showPauseOverlay() {
+      releaseMove();
       overlay.dataset.mode = "pause";
       overlayTitle.textContent = "PAUSA";
       overlayTitle.removeAttribute("aria-label");
@@ -1867,6 +1878,7 @@
       hideFinalBossCelebration();
       running = false;
       isPaused = false;
+      releaseMove();
       overlay.dataset.mode = "result";
       cancelAnimationFrame(animationId);
 
@@ -2140,24 +2152,16 @@
       return pointHitsControl(pauseBtn) || pointHitsControl(ultimateBtn);
     }
 
-    // Mitad izquierda / mitad derecha implementado acá: leemos la X real dentro del área jugable visible y activamos una sola dirección.
+    // Mitad izquierda / mitad derecha del viewport: ya no dependemos del rectángulo del stage ni de los márgenes negros.
     function updateTouchMoveDirectionFromPoint(clientX, clientY, target) {
       if (!canUseTouchControls() || isTouchMovementTargetBlocked(target, clientX, clientY)) {
         return false;
       }
 
-      const stageRect = stage.getBoundingClientRect();
-      if (
-        clientX < stageRect.left ||
-        clientX > stageRect.right ||
-        clientY < stageRect.top ||
-        clientY > stageRect.bottom
-      ) {
-        return false;
-      }
+      const viewportWidth = window.innerWidth || window.visualViewport?.width || document.documentElement.clientWidth || 0;
+      if (!viewportWidth) return false;
 
-      const relativeX = clientX - stageRect.left;
-      if (relativeX < stageRect.width / 2) {
+      if (clientX < viewportWidth / 2) {
         pressLeft();
       } else {
         pressRight();
@@ -3571,9 +3575,10 @@
       applyMoveState();
     }
 
-    // Limpieza al soltar/cancelar implementada acá: siempre resetea flags y dedo activo para frenar la nave.
+    // Limpieza al soltar/cancelar implementada acá: siempre resetea flags, modo y dedo activo para frenar la nave.
     function releaseMove() {
       activeMoveTouchId = null;
+      moveInputMode = null;
       moveLeft = false;
       moveRight = false;
       applyMoveState();
@@ -3616,32 +3621,34 @@
       if (["arrowleft", "arrowright", "a", "d"].includes(k)) releaseMove();
     });
 
-    const handleStagePointerStart = (event) => {
-      if (!canUseTouchControls() || event.pointerType === "mouse") return;
+    // Eliminación del conflicto pointer/touch: el movimiento móvil usa un solo flujo principal a la vez.
+    const handleViewportPointerStart = (event) => {
+      if (!USE_POINTER_EVENTS_FOR_MOBILE_MOVE || !canUseTouchControls() || event.pointerType === "mouse") return;
       if (activeMoveTouchId !== null && activeMoveTouchId !== event.pointerId) return;
-      const started = updateTouchMoveDirectionFromPoint(event.clientX, event.clientY, event.target);
+
+      const target = event.target || document.elementFromPoint(event.clientX, event.clientY);
+      const started = updateTouchMoveDirectionFromPoint(event.clientX, event.clientY, target);
       if (!started) return;
+
+      moveInputMode = "pointer";
       activeMoveTouchId = event.pointerId;
-      if (typeof stage.setPointerCapture === "function") {
-        stage.setPointerCapture(event.pointerId);
-      }
       event.preventDefault();
     };
 
-    const handleStagePointerMove = (event) => {
-      if (!canUseTouchControls() || event.pointerType === "mouse") return;
+    const handleViewportPointerMove = (event) => {
+      if (!USE_POINTER_EVENTS_FOR_MOBILE_MOVE || moveInputMode !== "pointer") return;
       if (activeMoveTouchId !== event.pointerId) return;
-      if (!updateTouchMoveDirectionFromPoint(event.clientX, event.clientY, event.target)) {
+
+      const target = document.elementFromPoint(event.clientX, event.clientY) || event.target;
+      if (!updateTouchMoveDirectionFromPoint(event.clientX, event.clientY, target)) {
         releaseMove();
       }
       event.preventDefault();
     };
 
-    const handleStagePointerEnd = (event) => {
+    const handleViewportPointerEnd = (event) => {
+      if (!USE_POINTER_EVENTS_FOR_MOBILE_MOVE || moveInputMode !== "pointer") return;
       if (activeMoveTouchId !== event.pointerId) return;
-      if (typeof stage.releasePointerCapture === "function" && stage.hasPointerCapture?.(event.pointerId)) {
-        stage.releasePointerCapture(event.pointerId);
-      }
       releaseMove();
       event.preventDefault();
     };
@@ -3654,47 +3661,52 @@
       return null;
     };
 
-    const handleStageTouchStart = (event) => {
-      if (!canUseTouchControls() || activeMoveTouchId !== null) return;
+    const handleViewportTouchStart = (event) => {
+      if (USE_POINTER_EVENTS_FOR_MOBILE_MOVE || !canUseTouchControls() || activeMoveTouchId !== null) return;
+
       for (const touch of event.changedTouches) {
-        if (updateTouchMoveDirectionFromPoint(touch.clientX, touch.clientY, event.target)) {
-          activeMoveTouchId = touch.identifier;
-          event.preventDefault();
-          break;
-        }
+        const target = document.elementFromPoint(touch.clientX, touch.clientY) || event.target;
+        if (!updateTouchMoveDirectionFromPoint(touch.clientX, touch.clientY, target)) continue;
+
+        moveInputMode = "touch";
+        activeMoveTouchId = touch.identifier;
+        event.preventDefault();
+        break;
       }
     };
 
-    const handleStageTouchMove = (event) => {
-      if (!canUseTouchControls()) return;
+    const handleViewportTouchMove = (event) => {
+      if (USE_POINTER_EVENTS_FOR_MOBILE_MOVE || moveInputMode !== "touch") return;
       const trackedTouch = findTrackedTouch(event.touches);
       if (!trackedTouch) return;
-      if (!updateTouchMoveDirectionFromPoint(trackedTouch.clientX, trackedTouch.clientY, document.elementFromPoint(trackedTouch.clientX, trackedTouch.clientY))) {
+
+      const target = document.elementFromPoint(trackedTouch.clientX, trackedTouch.clientY);
+      if (!updateTouchMoveDirectionFromPoint(trackedTouch.clientX, trackedTouch.clientY, target)) {
         releaseMove();
       }
       event.preventDefault();
     };
 
-    const handleStageTouchEnd = (event) => {
+    const handleViewportTouchEnd = (event) => {
+      if (USE_POINTER_EVENTS_FOR_MOBILE_MOVE || moveInputMode !== "touch") return;
       const trackedTouch = findTrackedTouch(event.changedTouches);
       if (!trackedTouch) return;
       releaseMove();
       event.preventDefault();
     };
 
-    stage.addEventListener("pointerdown", handleStagePointerStart, { passive: false });
-    stage.addEventListener("pointermove", handleStagePointerMove, { passive: false });
-    stage.addEventListener("pointerup", handleStagePointerEnd, { passive: false });
-    stage.addEventListener("pointercancel", handleStagePointerEnd, { passive: false });
-    stage.addEventListener("touchstart", handleStageTouchStart, { passive: false });
-    stage.addEventListener("touchmove", handleStageTouchMove, { passive: false });
-    stage.addEventListener("touchend", handleStageTouchEnd, { passive: false });
-    stage.addEventListener("touchcancel", handleStageTouchEnd, { passive: false });
+    if (USE_POINTER_EVENTS_FOR_MOBILE_MOVE) {
+      window.addEventListener("pointerdown", handleViewportPointerStart, { passive: false });
+      window.addEventListener("pointermove", handleViewportPointerMove, { passive: false });
+      window.addEventListener("pointerup", handleViewportPointerEnd, { passive: false });
+      window.addEventListener("pointercancel", handleViewportPointerEnd, { passive: false });
+    } else {
+      window.addEventListener("touchstart", handleViewportTouchStart, { passive: false });
+      window.addEventListener("touchmove", handleViewportTouchMove, { passive: false });
+      window.addEventListener("touchend", handleViewportTouchEnd, { passive: false });
+      window.addEventListener("touchcancel", handleViewportTouchEnd, { passive: false });
+    }
 
-    window.addEventListener("pointerup", handleStagePointerEnd, { passive: false });
-    window.addEventListener("pointercancel", handleStagePointerEnd, { passive: false });
-    window.addEventListener("touchend", handleStageTouchEnd, { passive: false });
-    window.addEventListener("touchcancel", handleStageTouchEnd, { passive: false });
     window.addEventListener("blur", releaseMove);
 
     pauseBtn.onclick = togglePause;
